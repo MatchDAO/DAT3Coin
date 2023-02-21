@@ -1,9 +1,10 @@
 [package]
-name = 'DAT3Poll'
+name = 'dat3pool'
 version = '1.0.0'
 [dependencies]
 # # https://github.com/aptos-labs/aptos-core.git
 AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework" }
+AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token" }
 [addresses]
 sdt = "0x1"
 publisher = "0xf2b1"
