@@ -2,7 +2,7 @@
 name = 'dat3'
 version = '0.0.1'
 [dependencies]
-#D:\work\project\move\aptos-core-1.0.4\aptos-move\framework\aptos-framework and call with the -d flag
+# https://github.com/aptos-labs/aptos-core.git
 AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework" }
 [addresses]
 sdt = "0x1"
