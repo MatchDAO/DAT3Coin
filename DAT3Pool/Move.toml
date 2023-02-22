@@ -1,10 +1,14 @@
 [package]
-name = 'dat3pool'
-version = '1.0.0'
+name = 'DAT3Pool'
+version = '0.0.1'
+upgrade_policy = "compatible"
 [dependencies]
 # # https://github.com/aptos-labs/aptos-core.git
 AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework" }
 AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token" }
+DAT3CoinBoot = { local = "../dat3coinboot" }
 [addresses]
 sdt = "0x1"
-publisher = "0xf2b1"
+dat3 = "0x4e952f93a49ad67364ad433f08ff6300b5f2d8fcb7faf0c379683d9bac3b6742"
+dat3_admin = "0x4e952f93a49ad67364ad433f08ff6300b5f2d8fcb7faf0c379683d9bac3b6742"
+qqq3="0x4e952f93a49ad67364ad433f08ff6300b5f2d8fcb7faf0c379683d9bac3b6742"

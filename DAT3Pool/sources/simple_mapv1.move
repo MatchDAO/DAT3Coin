@@ -4,7 +4,7 @@
 /// 3) A Key can be found within O(N) time
 /// 4) The keys are unsorted.
 /// 5) Adds and removals take O(N) time
-module publisher::simple_mapv1 {
+module dat3::simple_mapv1 {
     use std::error;
     use std::option;
     use std::vector;
@@ -105,9 +105,8 @@ module publisher::simple_mapv1 {
     }
 
     fun find_all<Key: store, Value: store>(
-        map: &SimpleMapV1<Key, Value>,
-        key: &Key,
-    ): &mut vector<Element<Key, Value>>{
+        map: &mut SimpleMapV1<Key, Value>
+    ):   &mut vector<Element<Key, Value>>{
         &mut map.data
     }
 
