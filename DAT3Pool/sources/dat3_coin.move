@@ -6,7 +6,7 @@ module dat3::dat3_coin {
     use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
 
 
-    struct DAT3 has key, store {}
+    struct DAT3 {}
 
     struct HodeCap has key {
         burnCap: BurnCapability<DAT3>,
