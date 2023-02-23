@@ -7,7 +7,7 @@ module dat3::dat3_pool {
     use aptos_framework::event::{Self, EventHandle};
 
     use dat3::dat3_coin::DAT3;
-
+    friend dat3::dat3_pool_routel;
     const ERR_NOT_ENOUGH_PERMISSIONS: u64 = 1000;
     const EINSUFFICIENT_BALANCE: u64 = 107;
     const RESOURCE_EXHAUSTED: u64 = 109;
@@ -72,15 +72,16 @@ module dat3::dat3_pool {
         coin::merge(&mut r_pool.coins, your_coin);
 
     }
-    //Is it safe?
-    public entry fun withdraw<CoinType: drop>( account: &signer, to: address,  amount: u64  ) acquires Pool {
+    //Is it safe? yes!
+    public(friend) fun withdraw<CoinType: drop>(  to: address,  amount: u64  ) acquires Pool {
         let addr = signer::address_of(account);
         assert!(addr == @dat3, ERR_NOT_ENOUGH_PERMISSIONS);
-        let a_pool = borrow_global_mut<Pool<CoinType>>(addr);
+        let a_pool = borrow_global_mut<Pool<CoinType>>(@dat3);
         coin::deposit<CoinType>(to, coin::extract(&mut a_pool.coins, amount));
     }
 
-    public entry fun withdraw_reward(account: &signer, to: address, amount: u64) acquires RewardPool {
+    // no &signer is right
+    public (friend) fun withdraw_reward( to: address, amount: u64) acquires RewardPool {
         let addr = signer::address_of(account);
         assert!(addr == @dat3, ERR_NOT_ENOUGH_PERMISSIONS);
         let r_pool = borrow_global_mut<RewardPool>(addr);
@@ -95,7 +96,10 @@ module dat3::dat3_pool {
     // Stake Emission            0.1                 ~720
     // Team&Invester Emission    0.1                 ~720
     // Current Total Emission    1                   ~7200
-    public entry fun r_distribution(coin: Coin<DAT3>) acquires RewardPool {
+    //?? What's this?
+    public entry fun r_distribution(account: &signer) acquires RewardPool {
+        let addr = signer::address_of(account);
+        assert!(addr == @dat3, ERR_NOT_ENOUGH_PERMISSIONS);
         let r_pool = borrow_global_mut<RewardPool>(@dat3);
         coin::merge(&mut r_pool.coins, coin);
     }

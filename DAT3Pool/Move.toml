@@ -9,6 +9,5 @@ AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token"
 DAT3CoinBoot = { local = "../dat3coinboot" }
 [addresses]
 sdt = "0x1"
-dat3 = "0x4e952f93a49ad67364ad433f08ff6300b5f2d8fcb7faf0c379683d9bac3b6742"
-dat3_admin = "0x4e952f93a49ad67364ad433f08ff6300b5f2d8fcb7faf0c379683d9bac3b6742"
-qqq3="0x4e952f93a49ad67364ad433f08ff6300b5f2d8fcb7faf0c379683d9bac3b6742"
+dat3 = "0xdc93ea6bd71ba363df305d0651e242d47a113a655af28bff1f009ebc68b4ff21"
+dat3_admin = "0xdc93ea6bd71ba363df305d0651e242d47a113a655af28bff1f009ebc68b4ff21"

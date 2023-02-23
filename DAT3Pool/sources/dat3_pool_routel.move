@@ -111,10 +111,10 @@ module dat3::dat3_pool_routel {
         let user_amount = auser.amount;
         assert!(user_amount > amount, error::out_of_range(EINSUFFICIENT_BALANCE));
         auser.amount = user_amount - amount;
-        dat3_pool::withdraw<CoinType>(&getSig(), user_address, amount);
+        dat3_pool::withdraw<CoinType>(  user_address, amount);
     }
 
-    //Move compilation failed:
+
     public entry fun claim_reward(account: &signer, amount: u64) acquires CapHode, UsersReward {
 
         let user_address = signer::address_of(account);
@@ -127,7 +127,7 @@ module dat3::dat3_pool_routel {
             if (coin::is_account_registered<DAT3>(user_address)) {
                 coin::register<DAT3>(account)
             };
-            dat3_pool::withdraw_reward(&getSig(), user_address, amount);
+            dat3_pool::withdraw_reward(  user_address, amount);
             *your = *your - amount;
         };
     }
@@ -136,10 +136,10 @@ module dat3::dat3_pool_routel {
         let user_address = signer::address_of(account);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         let user = borrow_global<Member>(user_address) ;
-        let user_r = borrow_global_mut<UsersReward>(@dat3);
+        let user_r = borrow_global<UsersReward>(@dat3);
         let your: u64 = 0;
         if (simple_mapv1::contains_key(&user_r.data, &user_address)) {
-             your = *simple_mapv1::borrow(&mut user_r.data, &user_address);
+             your = *simple_mapv1::borrow( &user_r.data, &user_address);
         };
         (user.amount, your)
     }
