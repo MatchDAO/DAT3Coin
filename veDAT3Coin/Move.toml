@@ -4,7 +4,6 @@ version = '0.0.1'
 upgrade_policy = "compatible"
 
 [addresses]
-vedat3 = "0x82ab0ed20d1c2935be9141ffed86eb3409d0c46459dc9131d26fbf89997db565"
-
+vedat3 = "0xe9d9437f1d797486c48d4e4e80c8ccbea3367a33964d0c2159dc877566c2ad2b"
 [dependencies.AptosFramework]
 local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework"

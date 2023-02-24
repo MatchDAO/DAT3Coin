@@ -4,12 +4,10 @@ version = '0.0.1'
 upgrade_policy = "compatible"
 
 [addresses]
-dat3 = "0x7d8320a497c20c1569cb6fecd7cc564f873de6316c462748a2b9c935e847384b"
-dat3_admin = "0x82ab0ed20d1c2935be9141ffed86eb3409d0c46459dc9131d26fbf89997db565"
+dat3 = "0x2ad9aeedff0534cd130fa90e91585011109d6dad346d1a08349e15112bb81b38"
+dat3_admin = "0xe9d9437f1d797486c48d4e4e80c8ccbea3367a33964d0c2159dc877566c2ad2b"
 [dependencies.AptosFramework]
 local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework"
-[dependencies.veDAT3Coin]
-local = "../veDAT3Coin/"
 #[addresses]
 #std="0x1"
 #dat3 = "0xdc93ea6bd71ba363df305d0651e242d47a113a655af28bff1f009ebc68b4ff21"

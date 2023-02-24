@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x7d8320a497c20c1569cb6fecd7cc564f873de6316c462748a2b9c935e847384b'
+DAT3='0x2ad9aeedff0534cd130fa90e91585011109d6dad346d1a08349e15112bb81b38'
 PROFILE="devnet"
 echo "dat3:'0x$DAT3'"
 DAT3_PATH=`pwd `
@@ -20,7 +20,6 @@ echo " step 1 :bigin compile&publish boot :  -->`pwd`"
 echo "`ls`"
 echo `aptos move compile --package-dir "$BOOT_PATH"`
 echo `aptos move publish --assume-yes --package-dir "$BOOT_PATH" `
-
 echo "1-------------------------------------------------------------------------------------------"
 cd $COIN_PATH
 echo " step 2 :bigin compile veDAT3Coin : -->`pwd`"
@@ -62,4 +61,4 @@ sleep 2
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool::init_pool --type-args "0x1::aptos_coin::AptosCoin"`
 
 
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init --type-args "0x1::aptos_coin::AptosCoin"`
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init`

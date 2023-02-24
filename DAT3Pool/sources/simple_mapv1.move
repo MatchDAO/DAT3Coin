@@ -104,7 +104,7 @@ module dat3::simple_mapv1 {
         option::none<u64>()
     }
 
-    fun find_all<Key: store, Value: store>(
+    public fun find_all<Key: store, Value: store>(
         map: &mut SimpleMapV1<Key, Value>
     ):   &mut vector<Element<Key, Value>>{
         &mut map.data
