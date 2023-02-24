@@ -6,7 +6,9 @@ module dat3::dat3_coin {
     use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
 
 
-    struct DAT3 {}
+
+
+    struct DAT3 has key {}
 
     struct HodeCap has key {
         burnCap: BurnCapability<DAT3>,
@@ -58,5 +60,36 @@ module dat3::dat3_coin {
         let user_address = signer::address_of(owner);
         coin::deposit(user_address, coin::extract(&mut mint_coin, (((amount as u128) * 70 / 100) as u64)));
         coin::deposit(to, mint_coin);
+    }
+
+
+    #[test_only]
+    use aptos_framework::coin::is_account_registered;
+    #[test_only]
+    use aptos_std::debug;
+    #[test_only]
+    use aptos_framework::aptos_account::{create_account};
+
+
+
+    #[test(dat3 = @dat3, to = @dat3_admin)]
+    fun dat3_coin_init(
+        dat3: &signer, to: &signer
+    ) {
+        let addr = signer::address_of(dat3);
+        let to_addr = signer::address_of(to);
+        create_account(addr);
+        create_account(to_addr);
+        init(dat3);
+        coin::register<DAT3>(dat3);
+        debug::print(&is_account_registered<DAT3>(addr));
+        let balance = coin::balance<DAT3>(addr);
+        debug::print(&balance);
+        coin::register<DAT3>(to);
+        coin::transfer<DAT3>(dat3, to_addr, 10001111);
+
+        debug::print(&coin::balance<DAT3>(addr));
+        debug::print(&coin::balance<DAT3>(to_addr));
+
     }
 }

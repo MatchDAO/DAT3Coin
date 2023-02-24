@@ -28,6 +28,7 @@ echo "`ls`"
 echo "aptos move compile --save-metadata --package-dir  $COIN_PATH "
 echo `aptos move compile --save-metadata --package-dir  $COIN_PATH`
 echo""
+
 #hexdump -ve '1/1 "%.2x"' build/veDAT3Coin/package-metadata.bcs > meta.hex
 #hexdump -ve '1/1 "%.2x"' build/veDAT3Coin/bytecode_modules/vedat3_coin.mv > coin.hex
 #xxd -ps -c10000000 build/veDAT3Coin/package-metadata.bcs > meta.hex
@@ -38,10 +39,27 @@ CODE=`xxd  -ps -c10000000  build/veDAT3Coin/bytecode_modules/vedat3_coin.mv`
 echo "mata: $META"
 echo "code: $CODE"
 pause "done"
+sleep 3 #
 echo "2-------------------------------------------------------------------------------------------"
 echo " step 3 :run dat3::dat3_coin_boot::initializeWithResourceAccount() "
 echo " begin"
 echo "aptos move run   --assume-yes --function-id $DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:$META  hex:$CODE"
 echo""
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:"$META" hex:"$CODE" string:"dat3"`
-pause "done"
+sleep 2
+
+cd $DAT3Pool
+echo "aptos move compile --save-metadata --package-dir  $DAT3Pool "
+echo `aptos move compile --save-metadata --package-dir  $DAT3Pool`
+echo `aptos move publish --assume-yes --package-dir "$DAT3Pool" `
+echo""
+sleep 2
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin::init `
+echo""
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin::mint_to --args u64:1000001  address:$DAT3`
+echo""
+sleep 2
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool::init_pool --type-args "0x1::aptos_coin::AptosCoin"`
+
+
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init --type-args "0x1::aptos_coin::AptosCoin"`
