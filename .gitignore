@@ -2,4 +2,4 @@
 */build/
 
 *.hex
-**/.aptos/
+.aptos/

@@ -7,9 +7,9 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x2ad9aeedff0534cd130fa90e91585011109d6dad346d1a08349e15112bb81b38'
+DAT3='0xf4fda1c5c66c5d233e3bf6f65d4f7ff9a72b0b7f3222c80fe8e4a68ac1ff3ebd'
 PROFILE="devnet"
-echo "dat3:'0x$DAT3'"
+echo "dat3:'0x$DAT3'" FUNCTION_RESOLUTION_FAILURE
 DAT3_PATH=`pwd `
 COIN_PATH="$DAT3_PATH/veDAT3Coin"
 BOOT_PATH="$DAT3_PATH/DAT3CoinBoot"
@@ -19,12 +19,14 @@ cd $BOOT_PATH
 echo " step 1 :bigin compile&publish boot :  -->`pwd`"
 echo "`ls`"
 echo `aptos move compile --package-dir "$BOOT_PATH"`
+
+echo "aptos move publish -->  $BOOT_PATH  "
 echo `aptos move publish --assume-yes --package-dir "$BOOT_PATH" `
 echo "1-------------------------------------------------------------------------------------------"
 cd $COIN_PATH
 echo " step 2 :bigin compile veDAT3Coin : -->`pwd`"
 echo "`ls`"
-echo "aptos move compile --save-metadata --package-dir  $COIN_PATH "
+echo "aptos move compile --> $COIN_PATH "
 echo `aptos move compile --save-metadata --package-dir  $COIN_PATH`
 echo""
 
@@ -37,28 +39,33 @@ echo""
 CODE=`xxd  -ps -c10000000  build/veDAT3Coin/bytecode_modules/vedat3_coin.mv`
 echo "mata: $META"
 echo "code: $CODE"
-pause "done"
+
 sleep 3 #
 echo "2-------------------------------------------------------------------------------------------"
 echo " step 3 :run dat3::dat3_coin_boot::initializeWithResourceAccount() "
 echo " begin"
-echo "aptos move run   --assume-yes --function-id $DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:$META  hex:$CODE"
+echo "$DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:$META  hex:$CODE"
 echo""
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:"$META" hex:"$CODE" string:"dat3"`
 sleep 2
-
+echo""
 cd $DAT3Pool
-echo "aptos move compile --save-metadata --package-dir  $DAT3Pool "
+echo "aptos move compile -->  $DAT3Pool "
 echo `aptos move compile --save-metadata --package-dir  $DAT3Pool`
-echo `aptos move publish --assume-yes --package-dir "$DAT3Pool" `
 echo""
 sleep 2
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin::init `
-echo""
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin::mint_to --args u64:1000001  address:$DAT3`
+echo "aptos move publish --> $DAT3Pool"
+echo `aptos move publish --assume-yes --package-dir  $DAT3Pool  `
 echo""
 sleep 2
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool::init_pool --type-args "0x1::aptos_coin::AptosCoin"`
-
-
+echo "$DAT3::dat3_manager::init_dat3_coin"
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_manager::init_dat3_coin`
+echo""
+sleep 2
+echo "$DAT3::dat3_pool::init_pool --type-args 0x1::aptos_coin::AptosCoin"
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool::init_pool --type-args "0x1::aptos_coin::AptosCoin" `
+echo""
+sleep 2
+echo "$DAT3::dat3_pool_routel::init"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init`
+sleep 2
