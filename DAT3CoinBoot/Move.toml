@@ -4,8 +4,8 @@ version = '0.0.2'
 upgrade_policy = "compatible"
 
 [addresses]
-dat3 = "0xf4fda1c5c66c5d233e3bf6f65d4f7ff9a72b0b7f3222c80fe8e4a68ac1ff3ebd"
-dat3_admin = "0xd30a63cec1a5fea7fddb2abb744cb4cd0fdd723a9d290f599cbe6774ec455db7"
+dat3 = "0xf1d6ae40b4e4f626bf258d24e0c36cdf6bf9498a686119db679e7a1dbe9a4ecb"
+dat3_admin = "0xe4b0b43b9d251691009b84e0dd36a3052de90abaae969c5cc93a6997223fa0d4"
 [dependencies.AptosFramework]
 local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework"
 #[addresses]

@@ -131,14 +131,15 @@ module dat3::dat3_pool_routel {
     }
 
     public fun fee_of_mine(user: &signer): (u64, u64) acquires FeeStore, Member {
-        let user_address = signer::address_of(user);
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
         let user_addr = signer::address_of(user);
+        assert!(exists<Member>(user_addr), error::not_found(NO_USER));
+
         let is_me = borrow_global<Member>(user_addr);
         let fee = borrow_global<FeeStore>(@dat3);
         (is_me.mFee, *simple_mapv1::borrow(&fee.mFee, &is_me.mFee))
     }
 
+    //Transaction Executed and Committed with Error INVALID MAIN FUNCTION SIGNATURE
     public fun change_my_fee(user: &signer, grade: u64): (u64, u64) acquires FeeStore, Member {
         let user_address = signer::address_of(user);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
@@ -282,6 +283,7 @@ module dat3::dat3_pool_routel {
     ) acquires Room, Member, FeeStore, RoomState {
         let requester_addr = signer::address_of(requester);
         //check user
+        assert!(requester_addr!=receiver, error::invalid_argument(INVALID_RECEIVER));
         assert!(exists<Member>(requester_addr), error::not_found(NO_USER));
         assert!(exists<Member>(receiver), error::not_found(NO_RECEIVER_USER));
         //get req_member
@@ -345,7 +347,7 @@ module dat3::dat3_pool_routel {
         account: &signer,
         requester: address,
         receiver: address
-    ) acquires Room, Member, RoomState {
+    ) acquires Room, Member, RoomState, UsersTotalConsumption {
         let account_addr = signer::address_of(account);
 
         assert!(exists<Member>(receiver), error::not_found(NO_USER));
@@ -365,12 +367,21 @@ module dat3::dat3_pool_routel {
             duration_m = req.max_duration;
         };
         //to return req.deposit
-        req.deposit = req.deposit - (duration_m * req.minute_rate);
+        let to_rec = duration_m * req.minute_rate ;
+        req.deposit = req.deposit - to_rec;
         req.finished_at = now_s;
         req.done = true;
-        let req_user = borrow_global_mut<Member>(receiver);
+        let req_user = borrow_global_mut<Member>(requester);
+        let rec_user = borrow_global_mut<Member>(receiver);
         req_user.amount = req_user.amount + req.deposit ;
-
+        //to rec //buser.amount = buser.amount + ((fee_s.chatFee * 70 as u128) / (100u128) as u64);
+        rec_user.amount = rec_user.amount + ((to_rec * 70 as u128) / (100u128) as u64);
+        // UsersTotal
+        let total = borrow_global_mut<UsersTotalConsumption>(@dat3);
+        let map = total.data;
+        let your = simple_mapv1::borrow_mut(&mut map, &requester);
+        *your = *your + to_rec.chatFee;
+        //change state
         room_state_change(requester, 0);
         room_state_change(receiver, 0);
     }

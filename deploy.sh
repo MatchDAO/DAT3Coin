@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0xf4fda1c5c66c5d233e3bf6f65d4f7ff9a72b0b7f3222c80fe8e4a68ac1ff3ebd'
+DAT3='0xf1d6ae40b4e4f626bf258d24e0c36cdf6bf9498a686119db679e7a1dbe9a4ecb'
 PROFILE="devnet"
 echo "dat3:'0x$DAT3'" FUNCTION_RESOLUTION_FAILURE
 DAT3_PATH=`pwd `
@@ -68,4 +68,7 @@ echo""
 sleep 2
 echo "$DAT3::dat3_pool_routel::init"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init`
-sleep 2
+#sleep 2
+#echo "$DAT3::dat3_pool_routel::user_init"
+#echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::user_init --type-args "0x1::aptos_coin::AptosCoin" --args u64:12  u64:13 `
+#sleep 2
