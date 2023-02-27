@@ -40,7 +40,8 @@ module dat3::dat3_pool {
     struct Inviter<phantom CoinType> has key, store {
         l: SimpleMap<u64, Coin<CoinType>>
     }
-
+    //Currently only aptos_coin can be initialized, otherwise there will be bugs
+    //Because the user balance is not distinguished by coinType
     public entry fun init_pool<CoinType>(account: &signer) {
         let addr = signer::address_of(account);
         assert!(addr == @dat3, PERMISSION_DENIED);

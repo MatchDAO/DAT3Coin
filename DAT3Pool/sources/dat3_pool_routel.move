@@ -205,12 +205,13 @@ module dat3::dat3_pool_routel {
         // check users
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         assert!(exists<Member>(to), error::not_found(NO_TO_USER));
+        assert!(user_address != to, error::not_found(NO_TO_USER));
         //get fee
         let fee_s = borrow_global<FeeStore>(@dat3);
         //get A userinfo
         let auser = borrow_global_mut<Member>(user_address);
         //check balance
-        assert!(auser.amount > fee_s.chatFee, error::out_of_range(EINSUFFICIENT_BALANCE));
+        assert!(auser.amount >= fee_s.chatFee, error::out_of_range(EINSUFFICIENT_BALANCE));
         //change user A's balance , that it subtracts fee
         auser.amount = auser.amount - fee_s.chatFee;
         //get B userinfo
@@ -283,7 +284,7 @@ module dat3::dat3_pool_routel {
     ) acquires Room, Member, FeeStore, RoomState {
         let requester_addr = signer::address_of(requester);
         //check user
-        assert!(requester_addr!=receiver, error::invalid_argument(INVALID_RECEIVER));
+        assert!(requester_addr != receiver, error::invalid_argument(INVALID_RECEIVER));
         assert!(exists<Member>(requester_addr), error::not_found(NO_USER));
         assert!(exists<Member>(receiver), error::not_found(NO_RECEIVER_USER));
         //get req_member
@@ -342,18 +343,20 @@ module dat3::dat3_pool_routel {
         req_session.started_at = timestamp::now_seconds()
     }
 
-    // 3. Upon closing of the session, send payment to the receiver, and refund any remaining funds to the requester
+    //3. Upon closing of the session, send payment to the receiver, and refund any remaining funds to the requester
     public entry fun close_room(
         account: &signer,
         requester: address,
         receiver: address
-    ) acquires Room, Member, RoomState, UsersTotalConsumption {
+    ) acquires Room, Member, RoomState, UsersTotalConsumption
+    {
         let account_addr = signer::address_of(account);
 
-        assert!(exists<Member>(receiver), error::not_found(NO_USER));
         assert!(exists<Member>(requester), error::not_found(NO_USER));
         assert!(exists<Room>(requester), error::invalid_state(INVALID_RECEIVER));
         let req = borrow_global_mut<Room>(receiver);
+
+        assert!(requester != receiver, error::invalid_state(INVALID_RECEIVER));
         assert!(account_addr == requester || account_addr == req.receiver, error::invalid_state(INVALID_RECEIVER));
         assert!(req.started_at > 0 && req.finished_at == 0, error::invalid_state(INVALID_RECEIVER));
         let now_s = timestamp::now_seconds();
@@ -371,19 +374,24 @@ module dat3::dat3_pool_routel {
         req.deposit = req.deposit - to_rec;
         req.finished_at = now_s;
         req.done = true;
-        let req_user = borrow_global_mut<Member>(requester);
-        let rec_user = borrow_global_mut<Member>(receiver);
+        let req_user = borrow_global_mut<Member>(account_addr);
+        assert!(exists<Member>(receiver), error::not_found(NO_USER));
+
         req_user.amount = req_user.amount + req.deposit ;
         //to rec //buser.amount = buser.amount + ((fee_s.chatFee * 70 as u128) / (100u128) as u64);
-        rec_user.amount = rec_user.amount + ((to_rec * 70 as u128) / (100u128) as u64);
+
         // UsersTotal
         let total = borrow_global_mut<UsersTotalConsumption>(@dat3);
         let map = total.data;
         let your = simple_mapv1::borrow_mut(&mut map, &requester);
-        *your = *your + to_rec.chatFee;
+        *your = *your + to_rec;
         //change state
         room_state_change(requester, 0);
         room_state_change(receiver, 0);
+        if (exists<Member>(receiver)) {
+            let rec_user = borrow_global_mut<Member>(receiver);
+            rec_user.amount = rec_user.amount + ((to_rec * 70 as u128) / (100u128) as u64);
+        } ;
     }
 
     #[view]

@@ -7,6 +7,7 @@ upgrade_policy = "compatible"
 AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework" }
 AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token" }
 DAT3CoinBoot = { local = "../dat3coinboot" }
+veDAT3Coin = { local = "../veDAT3Coin" }
 [addresses]
 std = "0x1"
 aptos_std = "0x1"
