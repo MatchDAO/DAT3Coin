@@ -5,11 +5,12 @@ module dat3::dat3_pool_routel {
 
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::coin;
+    use aptos_framework::timestamp;
 
     use dat3::dat3_coin::DAT3;
+    use dat3::dat3_coin_boot;
     use dat3::dat3_pool;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
-    use aptos_framework::timestamp;
 
     struct Member has key, store {
         uid: u64,
@@ -38,10 +39,11 @@ module dat3::dat3_pool_routel {
     }
 
     struct Room has key, store {
+        addr: address,
         started_at: u64,
         finished_at: u64,
-        max_duration: u64,
         minute_rate: u64,
+        minute: u64,
         // price per minute
         receiver: address,
         deposit: u64,
@@ -66,6 +68,7 @@ module dat3::dat3_pool_routel {
     const YOU_HAS_ALREADY_JOINED: u64 = 201;
     const INVALID_RECEIVER: u64 = 202;
     const INVALID_REQUESTER: u64 = 202;
+    const INVALID_ROOM_STATE: u64 = 203;
 
     struct CapHode has key {
         sigCap: SignerCapability,
@@ -89,8 +92,14 @@ module dat3::dat3_pool_routel {
         simple_mapv1::add(&mut mFee, 5, 100000000);
         move_to(account, FeeStore { chatFee: 1000000, mFee });
         move_to(account, RoomState { data: simple_mapv1::create() });
-
-        //move_to(account, CapHode { sigCap: dat3::dat3_coin_boot::retrieveResourceSignerCap(account) });
+        let module_authority = dat3_coin_boot::retrieveResourceSignerCap(account);
+        move_to(&account::create_signer_with_capability(&module_authority), Member {
+            uid: 101,
+            fid: 1002,
+            freeze: 0,
+            amount: 0,
+            mFee: 1,
+        });
     }
 
 
@@ -279,7 +288,6 @@ module dat3::dat3_pool_routel {
     // 1. A requester can initiate a payment stream session for a video call.
     public entry fun create_rome(
         requester: &signer,
-        duration: u64,
         receiver: address
     ) acquires Room, Member, FeeStore, RoomState {
         let requester_addr = signer::address_of(requester);
@@ -288,16 +296,10 @@ module dat3::dat3_pool_routel {
         assert!(exists<Member>(requester_addr), error::not_found(NO_USER));
         assert!(exists<Member>(receiver), error::not_found(NO_RECEIVER_USER));
         //get req_member
-        let req_member = borrow_global_mut<Member>(requester_addr) ;
+        let req_member = borrow_global<Member>(requester_addr) ;
         //get fee
         let fee_store = borrow_global<FeeStore>(receiver) ;
         let fee = simple_mapv1::borrow(&fee_store.mFee, &req_member.mFee);
-        //get max_duration
-        let max_duration = (((req_member.amount as u128) / (*fee as u128)) as u64);
-        assert!(duration <= max_duration, error::invalid_argument(EINSUFFICIENT_BALANCE));
-        let deposit = *fee * duration;
-        //extract amount
-        req_member.amount = req_member.amount - deposit;
         //Deposit funds to rome extract amount
         if (exists<Room>(requester_addr)) {
             let session = borrow_global_mut<Room>(requester_addr);
@@ -306,20 +308,22 @@ module dat3::dat3_pool_routel {
             // Overwrite the finished session
             session.started_at = 0;
             session.finished_at = 0;
-            session.max_duration = duration;
             session.minute_rate = *fee;
             session.receiver = receiver;
-            session.deposit = deposit;
+            session.deposit = 0;
             session.done = false;
+            session.minute = 0;
+            session.addr = requester_addr;
         } else {
             move_to(requester, Room {
                 started_at: 0,
                 finished_at: 0,
-                max_duration: duration,
                 minute_rate: *fee,
                 receiver,
-                deposit,
+                deposit: 0,
+                minute: 0,
                 done: false,
+                addr: requester_addr,
             })
         };
         room_state(requester_addr, 1);
@@ -327,20 +331,57 @@ module dat3::dat3_pool_routel {
     }
 
     // 2. The receiver can join the session through the video call link
-    public entry fun join_room(receiver: &signer, requester: address) acquires Room, RoomState {
+    public entry fun join_room(receiver: &signer, requester: address, join: bool) acquires Room, RoomState, Member {
         let receiver_addr = signer::address_of(receiver);
         assert!(exists<Member>(receiver_addr), error::not_found(NO_USER));
         assert!(exists<Member>(requester), error::not_found(NO_USER));
         assert!(exists<Room>(requester), error::invalid_state(INVALID_REQUESTER));
         let req_session = borrow_global_mut<Room>(requester);
-        //check req state
-        assert!(req_session.started_at == 0, error::invalid_state(WHO_HAS_ALREADY_JOINED));
         //check receiver
-        assert!(req_session.receiver == receiver_addr, error::invalid_state(INVALID_RECEIVER));
+        assert!(
+            (req_session.receiver == receiver_addr) && req_session.addr == requester,
+            error::invalid_state(INVALID_RECEIVER)
+        );
+        if (join) {
+            //check req state
+            assert!(req_session.started_at == 0, error::invalid_state(WHO_HAS_ALREADY_JOINED));
+            //check rec state
+            assert!(assert_room_state(receiver_addr) == 0, error::invalid_state(YOU_HAS_ALREADY_JOINED));
+            let req_user = borrow_global_mut<Member>(requester);
+            //check req_user balance
+            assert!(req_user.amount >= req_session.minute_rate, EINSUFFICIENT_BALANCE);
+            req_user.amount = req_user.amount - req_session.minute_rate;
+            req_session.started_at = timestamp::now_seconds();
+            //first minute
+            req_session.minute = 1;
+            //Deduction in the first minute
+            req_session.deposit = req_session.deposit + req_session.minute_rate;
+            room_state(receiver_addr, 2);
+        }else {
+            req_session.done = true;
+            room_state(requester, 0);
+        };
+    }
+
+    public entry fun one_minute(requester: &signer) acquires Room, RoomState, Member {
+        let requester_addr = signer::address_of(requester);
+        assert!(exists<Member>(requester_addr), error::not_found(NO_USER));
+        assert!(exists<Room>(requester_addr), error::invalid_state(INVALID_REQUESTER));
+        let req_session = borrow_global_mut<Room>(requester_addr);
+        //check done
+        assert!(!req_session.done, error::invalid_state(INVALID_ROOM_STATE));
+        //check req state
+        assert!(req_session.started_at > 0, error::invalid_state(INVALID_ROOM_STATE));
         //check rec state
-        assert!(assert_room_state(receiver_addr) == 0, error::invalid_state(YOU_HAS_ALREADY_JOINED));
-        room_state(receiver_addr, 2);
-        req_session.started_at = timestamp::now_seconds()
+        assert!(assert_room_state(requester_addr) == 0, error::invalid_state(INVALID_ROOM_STATE));
+        let req_user = borrow_global_mut<Member>(requester_addr);
+        //check req_user balance
+        assert!(req_user.amount >= req_session.minute_rate, EINSUFFICIENT_BALANCE);
+        req_user.amount = req_user.amount - req_session.minute_rate;
+        //first minute
+        req_session.minute = req_session.minute + 1;
+        //Deduction in the first minute
+        req_session.deposit = req_session.deposit + req_session.minute_rate;
     }
 
     //3. Upon closing of the session, send payment to the receiver, and refund any remaining funds to the requester
@@ -351,89 +392,43 @@ module dat3::dat3_pool_routel {
     ) acquires Room, Member, RoomState, UsersTotalConsumption
     {
         let account_addr = signer::address_of(account);
-
-        assert!(exists<Member>(requester), error::not_found(NO_USER));
+        assert!(exists<Member>(receiver), error::not_found(NO_USER));
+        assert!(exists<Member>(receiver), error::not_found(NO_USER));
         assert!(exists<Room>(requester), error::invalid_state(INVALID_RECEIVER));
         let req = borrow_global_mut<Room>(receiver);
-
-        assert!(requester != receiver, error::invalid_state(INVALID_RECEIVER));
-        assert!(account_addr == requester || account_addr == req.receiver, error::invalid_state(INVALID_RECEIVER));
+        //check done
+        assert!(!req.done, error::invalid_state(INVALID_ROOM_STATE));
+        //check receiver
+        assert!(
+            (req.receiver == receiver) && (req.addr == requester) && (account_addr == req.receiver || account_addr == req.addr),
+            error::invalid_state(INVALID_RECEIVER)
+        );
+        //check time
         assert!(req.started_at > 0 && req.finished_at == 0, error::invalid_state(INVALID_RECEIVER));
         let now_s = timestamp::now_seconds();
-        let duration_s = ((now_s - req.started_at) as u128);
-        let duration_m = ((duration_s / 60u128) as u64);
-        let temp = ((duration_s % 60u128) as u64);
-        if (temp > 0) {
-            duration_m = duration_m + 1;
-        };
-        if (req.max_duration <= duration_m) {
-            duration_m = req.max_duration;
-        };
         //to return req.deposit
-        let to_rec = duration_m * req.minute_rate ;
-        req.deposit = req.deposit - to_rec;
         req.finished_at = now_s;
         req.done = true;
-        let req_user = borrow_global_mut<Member>(account_addr);
-        assert!(exists<Member>(receiver), error::not_found(NO_USER));
-
-        req_user.amount = req_user.amount + req.deposit ;
-        //to rec //buser.amount = buser.amount + ((fee_s.chatFee * 70 as u128) / (100u128) as u64);
-
+        let to_rec = req.deposit;
+        req.deposit == 0;
+        let req_user = borrow_global_mut<Member>(receiver);
         // UsersTotal
         let total = borrow_global_mut<UsersTotalConsumption>(@dat3);
         let map = total.data;
         let your = simple_mapv1::borrow_mut(&mut map, &requester);
         *your = *your + to_rec;
+        //to rec
+        let rec_user = borrow_global_mut<Member>(receiver);
+        rec_user.amount = rec_user.amount + ((to_rec * 70 as u128) / (100u128) as u64);
         //change state
         room_state_change(requester, 0);
         room_state_change(receiver, 0);
-        if (exists<Member>(receiver)) {
-            let rec_user = borrow_global_mut<Member>(receiver);
-            rec_user.amount = rec_user.amount + ((to_rec * 70 as u128) / (100u128) as u64);
-        } ;
     }
 
     #[view]
-    public fun remaining_time(requester: address): (u64, u64, u64, u64, address, u64, bool) acquires Room {
-        let session = borrow_global<Room>(requester);
-        (session.started_at, session.finished_at, session.max_duration, session.minute_rate, session.receiver, session.deposit, session.done)
+    public fun remaining_time(requester: address): (address, address, u64, u64, u64, u64, u64, bool) acquires Room {
+        assert!(exists<Room>(requester), error::not_found(NO_USER));
+        let room = borrow_global<Room>(requester);
+        (room.addr, room.receiver, room.started_at, room.finished_at, room.minute_rate, room.minute, room.deposit, room.done)
     }
-    // #[test_only]
-    // use aptos_std::debug;
-    // #[test_only]
-    // use aptos_framework::aptos_account::create_account;
-    // #[test_only]
-    // use dat3::dat3_pool::init_pool;
-
-    // #[test(dat3 = @dat3)]
-    // fun dat3_coin_init(
-    //     dat3: &signer
-    // ) acquires UsersReward, UsersTotalConsumption, Member, FeeStore {
-    //     let addr = signer::address_of(dat3);
-    //     create_account(addr);
-    //     //init&register dat3_coin
-    //     dat3::dat3_coin::init(dat3);
-    //     coin::register<DAT3>(dat3);
-    //     //init pool
-    //     init_pool<DAT3>(dat3);
-    //     //init dat3_pool_routel resources
-    //     init(dat3);
-    //
-    //     debug::print(&coin::balance<DAT3>(addr));
-    //     user_init<DAT3>(dat3, 188, 199);
-    //     let (a, b) = balance_of(dat3);
-    //     debug::print(&a);
-    //     debug::print(&b);
-    //     deposit<DAT3>(dat3, 188);
-    //     deposit<DAT3>(dat3, 2);
-    //     let (a, b) = balance_of(dat3);
-    //     debug::print(&a);
-    //     debug::print(&b);
-    //
-    //     withdraw<DAT3>(dat3, 179);
-    //     let (a, b) = balance_of(dat3);
-    //     debug::print(&a);
-    //     debug::print(&b);
-    // }
 }

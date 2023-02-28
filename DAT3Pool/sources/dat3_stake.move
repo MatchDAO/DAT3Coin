@@ -62,9 +62,17 @@ module dat3::dat3_stake {
         move_to<Pool>(sender, Pool {
             stake: coin::zero<DAT3>(), reward: coin::zero<DAT3>(), burn, mint,
         });
+        let s=simple_mapv1::create();
+        simple_mapv1::add(&mut s,@dat3_admin,UserPosition{
+            amount_staked: 0,
+            start_time: 0,
+            duration: 0,
+            reward: coin::zero<DAT3>(),
+        });
         move_to<PoolInfo>(sender, PoolInfo {
             data: simple_mapv1::create(),
         });
+
     }
 
     public entry fun more(sender: &signer, amount: u64) acquires Pool, PoolInfo
