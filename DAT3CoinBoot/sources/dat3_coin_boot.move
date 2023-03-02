@@ -53,6 +53,17 @@ module dat3::dat3_coin_boot {
         let sig = account::create_signer_with_capability(&signer_cap);
         debug::print(&signer::address_of(dat3));
         debug::print(&signer::address_of(&sig));
+        let year =50u128 /50;
+        let m=1u128;
+
+        let i=0u128;
+        while (i < year) {
+             m=m*2;
+            i=i+1;
+        };
+        debug::print(&m );
+       let mint= (((7200 as u128) / m ) as u64);
+        debug::print(&mint );
 
 
         // return sig
