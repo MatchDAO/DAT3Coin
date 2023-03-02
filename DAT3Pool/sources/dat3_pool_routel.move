@@ -139,6 +139,7 @@ module dat3::dat3_pool_routel {
         });
     }
 
+    #[view]
     public fun fee_of_mine(user: &signer): (u64, u64) acquires FeeStore, Member {
         let user_addr = signer::address_of(user);
         assert!(exists<Member>(user_addr), error::not_found(NO_USER));
@@ -149,27 +150,55 @@ module dat3::dat3_pool_routel {
     }
 
     //Transaction Executed and Committed with Error INVALID MAIN FUNCTION SIGNATURE
-    public fun change_my_fee(user: &signer, grade: u64): (u64, u64) acquires FeeStore, Member {
+    public fun change_my_fee(user: &signer, grade: u64) acquires  Member {
         let user_address = signer::address_of(user);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
         let user_addr = signer::address_of(user);
         let is_me = borrow_global_mut<Member>(user_addr);
         is_me.mFee = grade;
-        let fee = borrow_global<FeeStore>(@dat3);
-        (grade, *simple_mapv1::borrow(&fee.mFee, &is_me.mFee))
     }
 
-    public fun change_sys_fee(user: &signer, grade: u64, fee: u64) acquires FeeStore {
+    public fun change_sys_fee(user: &signer, grade: u64, fee: u64,cfee:u64) acquires FeeStore {
         let user_address = signer::address_of(user);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
         assert!(fee > 0, error::out_of_range(OUT_OF_RANGE));
         let fee_s = borrow_global_mut<FeeStore>(@dat3);
-        let old_fee = simple_mapv1::borrow_mut(&mut fee_s.mFee, &grade);
-        *old_fee = fee;
+        if(cfee>0){
+            fee_s.chatFee=cfee;
+        };
+        if(grade>0){
+            let old_fee = simple_mapv1::borrow_mut(&mut fee_s.mFee, &grade);
+            *old_fee = fee;
+        };
+
     }
 
+    public fun change_sys_fid(user: &signer, fid: u64, del:bool) acquires FidStore {
+        let user_address = signer::address_of(user);
+        assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
+        assert!(exists<FidStore>(@dat3), error::permission_denied(PERMISSION_DENIED));
+       let f= borrow_global_mut<FidStore>(@dat3);
+
+       let contains=  simple_mapv1::contains_key(&f.data,&fid);
+        if(contains){
+            if(del){
+                let fvalue=simple_mapv1::borrow(&f.data,&fid );
+                assert!(*fvalue==0,PERMISSION_DENIED);
+                simple_mapv1::remove(&mut f.data,&fid);
+            };
+
+        }else {
+            if(!del){
+                let fvalue=simple_mapv1::borrow(&f.data,&fid );
+                assert!(*fvalue==0,PERMISSION_DENIED);
+                simple_mapv1::add(&mut f.data,fid,0);
+            };
+        };
+
+    }
+    #[view]
     public fun fee_of_all()
     : (u64, vector<u64>) acquires FeeStore
     {
@@ -252,6 +281,7 @@ module dat3::dat3_pool_routel {
         };
     }
 
+    #[view]
     public fun balance_of(account: &signer): (u64, u64) acquires Member, UsersReward {
         let user_address = signer::address_of(account);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
@@ -263,6 +293,7 @@ module dat3::dat3_pool_routel {
         };
         (user.amount, your)
     }
+
 
     fun assert_room_state(addr: address): u8 acquires RoomState {
         let data = borrow_global<RoomState>(@dat3) ;
@@ -411,7 +442,6 @@ module dat3::dat3_pool_routel {
         req.done = true;
         let to_rec = req.deposit;
         req.deposit == 0;
-        let req_user = borrow_global_mut<Member>(receiver);
         // UsersTotal
         let total = borrow_global_mut<UsersTotalConsumption>(@dat3);
         let map = total.data;

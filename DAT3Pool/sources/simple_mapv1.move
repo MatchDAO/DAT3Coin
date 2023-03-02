@@ -104,10 +104,12 @@ module dat3::simple_mapv1 {
         option::none<u64>()
     }
 
-    public fun find_all<Key: store, Value: store>(
+    public fun find_index<Key: store, Value: store>(
         map: &mut SimpleMapV1<Key, Value>
-    ):   &mut vector<Element<Key, Value>>{
-        &mut map.data
+        ,i:u64
+    ): (&mut Key,&mut Value )   {
+        let element = vector::borrow_mut( &mut map.data, i);
+        (&mut element.key,&mut element.value)
     }
 
 
