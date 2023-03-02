@@ -8,7 +8,6 @@ module dat3::dat3_pool_routel {
     use aptos_framework::timestamp;
 
     use dat3::dat3_coin::DAT3;
-    use dat3::dat3_coin_boot;
     use dat3::dat3_pool;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
 
@@ -37,7 +36,10 @@ module dat3::dat3_pool_routel {
     struct FidStore has key, store {
         data: SimpleMapV1<u64, u64>,
     }
-
+    struct FidResult   {
+        fid: u64,
+        val: u64,
+    }
     struct Room has key, store {
         addr: address,
         started_at: u64,
@@ -55,20 +57,22 @@ module dat3::dat3_pool_routel {
     }
 
     const PERMISSION_DENIED: u64 = 1000;
-    const EINSUFFICIENT_BALANCE: u64 = 107u64;
-    const NO_USER: u64 = 108u64;
-    const NO_TO_USER: u64 = 108u64;
-    const NO_RECEIVER_USER: u64 = 108u64;
-    const NOT_FOUND: u64 = 110u64;
-    const ALREADY_EXISTS: u64 = 111u64;
-    const OUT_OF_RANGE: u64 = 112;
-    const INVALID_ARGUMENT: u64 = 113;
-    const ALREADY_HAS_OPEN_SESSION: u64 = 200;
-    const WHO_HAS_ALREADY_JOINED: u64 = 201;
-    const YOU_HAS_ALREADY_JOINED: u64 = 201;
-    const INVALID_RECEIVER: u64 = 202;
-    const INVALID_REQUESTER: u64 = 202;
-    const INVALID_ROOM_STATE: u64 = 203;
+
+    const INVALID_ARGUMENT: u64 = 105;
+    const OUT_OF_RANGE: u64 = 106;
+    const EINSUFFICIENT_BALANCE: u64 = 107;
+    const NO_USER: u64 = 108;
+    const NO_TO_USER: u64 = 109;
+    const NO_RECEIVER_USER: u64 = 110;
+    const NOT_FOUND: u64 = 111;
+    const ALREADY_EXISTS: u64 = 112;
+
+    const ALREADY_HAS_OPEN_SESSION: u64 = 300;
+    const WHO_HAS_ALREADY_JOINED: u64 = 301;
+    const YOU_HAS_ALREADY_JOINED: u64 = 302;
+    const INVALID_RECEIVER: u64 = 303;
+    const INVALID_REQUESTER: u64 = 304;
+    const INVALID_ROOM_STATE: u64 = 305;
 
     struct CapHode has key {
         sigCap: SignerCapability,
@@ -92,14 +96,15 @@ module dat3::dat3_pool_routel {
         simple_mapv1::add(&mut mFee, 5, 100000000);
         move_to(account, FeeStore { chatFee: 1000000, mFee });
         move_to(account, RoomState { data: simple_mapv1::create() });
-        let module_authority = dat3_coin_boot::retrieveResourceSignerCap(account);
-        move_to(&account::create_signer_with_capability(&module_authority), Member {
-            uid: 101,
-            fid: 1002,
-            freeze: 0,
-            amount: 0,
-            mFee: 1,
-        });
+        //
+        // let module_authority = dat3_coin_boot::retrieveResourceSignerCap(account);
+        // move_to(&account::create_signer_with_capability(&module_authority), Member {
+        //     uid: 101,
+        //     fid: 1002,
+        //     freeze: 0,
+        //     amount: 0,
+        //     mFee: 1,
+        // });
     }
 
 
@@ -108,7 +113,7 @@ module dat3::dat3_pool_routel {
         account::create_signer_with_capability(&borrow_global<CapHode>(@dat3).sigCap)
     }
 
-    public entry fun user_init<CoinType>(account: &signer, fid: u64, uid: u64)
+    public entry fun user_init(account: &signer, fid: u64, uid: u64)
     acquires UsersReward, UsersTotalConsumption
     {
         let user_address = signer::address_of(account);
@@ -127,8 +132,8 @@ module dat3::dat3_pool_routel {
         if (!simple_mapv1::contains_key(&user_t.data, &user_address)) {
             simple_mapv1::add(&mut user_t.data, user_address, 0);
         };
-        if (coin::is_account_registered<CoinType>(user_address)) {
-            coin::register<CoinType>(account);
+        if (coin::is_account_registered<0x1::aptos_coin::AptosCoin >(user_address)) {
+            coin::register<0x1::aptos_coin::AptosCoin >(account);
         };
         move_to(account, Member {
             uid,
@@ -150,7 +155,7 @@ module dat3::dat3_pool_routel {
     }
 
     //Transaction Executed and Committed with Error INVALID MAIN FUNCTION SIGNATURE
-    public fun change_my_fee(user: &signer, grade: u64) acquires  Member {
+    public entry fun change_my_fee(user: &signer, grade: u64) acquires  Member {
         let user_address = signer::address_of(user);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
@@ -159,7 +164,7 @@ module dat3::dat3_pool_routel {
         is_me.mFee = grade;
     }
 
-    public fun change_sys_fee(user: &signer, grade: u64, fee: u64,cfee:u64) acquires FeeStore {
+    public entry fun change_sys_fee(user: &signer, grade: u64, fee: u64,cfee:u64) acquires FeeStore {
         let user_address = signer::address_of(user);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
@@ -175,7 +180,7 @@ module dat3::dat3_pool_routel {
 
     }
 
-    public fun change_sys_fid(user: &signer, fid: u64, del:bool) acquires FidStore {
+    public entry fun change_sys_fid(user: &signer, fid: u64, del:bool) acquires FidStore {
         let user_address = signer::address_of(user);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(exists<FidStore>(@dat3), error::permission_denied(PERMISSION_DENIED));
@@ -185,18 +190,33 @@ module dat3::dat3_pool_routel {
         if(contains){
             if(del){
                 let fvalue=simple_mapv1::borrow(&f.data,&fid );
-                assert!(*fvalue==0,PERMISSION_DENIED);
+                assert!(*fvalue==0,error::permission_denied(ALREADY_EXISTS));
                 simple_mapv1::remove(&mut f.data,&fid);
             };
 
         }else {
             if(!del){
-                let fvalue=simple_mapv1::borrow(&f.data,&fid );
-                assert!(*fvalue==0,PERMISSION_DENIED);
                 simple_mapv1::add(&mut f.data,fid,0);
             };
         };
 
+    }
+    #[view]
+    public fun  fid_reward(  ):vector<FidResult> acquires FidStore {
+        assert!(exists<FidStore>(@dat3), error::not_found(NOT_FOUND));
+        let f= borrow_global<FidStore>(@dat3);
+
+        //
+        let leng = simple_mapv1::length(&f.data);
+        let i = 0;
+        let fids = vector::empty< FidResult>();
+        //Expected a single non-reference type
+        while (i < leng) {
+           let (fid,val)= simple_mapv1::find_index(  &f.data ,i );
+            vector::push_back(&mut fids, FidResult{fid: *fid,val: *val} );
+            i=i+1;
+        };//Invalid mutable borrow from an immutable reference
+        fids
     }
     #[view]
     public fun fee_of_all()
@@ -213,29 +233,29 @@ module dat3::dat3_pool_routel {
     }
 
     fun cheak_fid(fid: u64): bool {
-        assert!(fid > 0, error::not_found(ALREADY_EXISTS));
+        assert!(fid > 0, error::invalid_argument(INVALID_ARGUMENT));
         true
     }
 
     // deposit token
-    public entry fun deposit<CoinType>(account: &signer, amount: u64) acquires Member {
+    public entry fun deposit (account: &signer, amount: u64) acquires Member {
         let user_address = signer::address_of(account);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         let auser = borrow_global_mut<Member>(user_address);
         let user_amount = auser.amount;
         auser.amount = user_amount + amount;
-        dat3_pool::deposit<CoinType>(account, amount);
+        dat3_pool::deposit (account, amount);
     }
 
     //Move compilation failed:
-    public entry fun withdraw<CoinType>(account: &signer, amount: u64) acquires Member {
+    public entry fun withdraw (account: &signer, amount: u64) acquires Member {
         let user_address = signer::address_of(account);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         let auser = borrow_global_mut<Member>(user_address);
         let user_amount = auser.amount;
         assert!(user_amount > amount, error::out_of_range(EINSUFFICIENT_BALANCE));
         auser.amount = user_amount - amount;
-        dat3_pool::withdraw<CoinType>(user_address, amount);
+        dat3_pool::withdraw (user_address, amount);
     }
 
     public entry fun call_1(account: &signer, to: address) acquires Member, FeeStore, UsersTotalConsumption {
@@ -407,7 +427,7 @@ module dat3::dat3_pool_routel {
         assert!(assert_room_state(requester_addr) == 0, error::invalid_state(INVALID_ROOM_STATE));
         let req_user = borrow_global_mut<Member>(requester_addr);
         //check req_user balance
-        assert!(req_user.amount >= req_session.minute_rate, EINSUFFICIENT_BALANCE);
+        assert!(req_user.amount >= req_session.minute_rate, error::aborted(EINSUFFICIENT_BALANCE));
         req_user.amount = req_user.amount - req_session.minute_rate;
         //first minute
         req_session.minute = req_session.minute + 1;

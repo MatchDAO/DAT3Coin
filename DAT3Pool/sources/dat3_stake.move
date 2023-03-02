@@ -13,6 +13,7 @@ module dat3::dat3_stake {
     use dat3::simple_mapv1::{Self, SimpleMapV1};
     use std::vector;
     use aptos_std::math128;
+    use std::error;
 
     friend dat3::dat3_manager;
     struct UserPosition has key, store {
@@ -50,15 +51,15 @@ module dat3::dat3_stake {
 
 
     const PERMISSION_DENIED: u64 = 1000;
-    const EINSUFFICIENT_BALANCE: u64 = 107u64;
-    const NO_USER: u64 = 108u64;
-    const NO_TO_USER: u64 = 108u64;
-    const NOT_FOUND: u64 = 110u64;
-    const ALREADY_EXISTS: u64 = 111u64;
-    const OUT_OF_RANGE: u64 = 112;
-    const INVALID_ARGUMENT: u64 = 113;
-    const INCENTIVE_POOL_NOT_FOUND: u64 = 134;
-    const DEADLINE_ERR: u64 = 135;
+    const INVALID_ARGUMENT: u64 = 105;
+    const OUT_OF_RANGE: u64 = 106;
+    const EINSUFFICIENT_BALANCE: u64 = 107;
+    const NO_USER: u64 = 108;
+    const NO_TO_USER: u64 = 109;
+    const NOT_FOUND: u64 = 111;
+    const ALREADY_EXISTS: u64 = 112;
+    const INCENTIVE_POOL_NOT_FOUND: u64 = 400;
+    const DEADLINE_ERR: u64 = 401;
 
     //7d of seconds
     const ONE_W: u64 = 604800;
@@ -68,42 +69,50 @@ module dat3::dat3_stake {
     )
     {
         let addr = signer::address_of(sender);
-        assert!(addr == @dat3, PERMISSION_DENIED);
-        assert!(!exists<Pool>(@dat3), ALREADY_EXISTS);
-        let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
-        let auth_signer = account::create_signer_with_capability(&module_authority);
-        let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
-            string::utf8(b"veDAT3 Coin"),
-            string::utf8(b"veDAT3"),
-            6u8, true);
-        coin::destroy_freeze_cap(freeze);
-        move_to<Pool>(sender, Pool {
-            rate_of: 3836,
-            rate_of_decimal: 10000,
-            max_lock_time: 52,
-            stake: coin::zero<DAT3>(), reward: coin::zero<DAT3>(), burn, mint,
-        });
-        let s = simple_mapv1::create();
-        simple_mapv1::add(&mut s, @dat3_admin, UserPosition {
-            amount_staked: 0,
-            start_time: 0,
-            duration: 0,
-            reward: coin::zero<DAT3>(),
-        });
-        move_to<PoolInfo>(sender, PoolInfo {
-            data: s,
-        });
+        assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
+        assert!(!exists<GenesisInfo>(@dat3), error::not_found(NOT_FOUND));
+
+        if(!exists<Pool>(addr)){
+            let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
+            let auth_signer = account::create_signer_with_capability(&module_authority);
+            let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
+                string::utf8(b"veDAT3 Coin"),
+                string::utf8(b"veDAT3"),
+                6u8, true);
+            coin::destroy_freeze_cap(freeze);
+            move_to<Pool>(sender, Pool {
+                rate_of: 3836,
+                rate_of_decimal: 10000,
+                max_lock_time: 52,
+                stake: coin::zero<DAT3>(), reward: coin::zero<DAT3>(), burn, mint,
+            });
+        };
+
+        if(!exists<PoolInfo>(addr)){
+            let s = simple_mapv1::create();
+            simple_mapv1::add(&mut s, @dat3_admin, UserPosition {
+                amount_staked: 0,
+                start_time: 0,
+                duration: 0,
+                reward: coin::zero<DAT3>(),
+            });
+
+            move_to<PoolInfo>(sender, PoolInfo {
+                data: s,
+            });
+        };
+
         move_to<GenesisInfo>(sender, GenesisInfo { genesis_time: timestamp::now_seconds() })
     }
 
     public entry fun more_stake(sender: &signer, amount: u64) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
-        assert!(coin::is_account_registered<DAT3>(addr), INVALID_ARGUMENT);
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(coin::is_account_registered<DAT3>(addr), error::aborted(NOT_FOUND));
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         // check user
-        assert!(simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
+        assert!(simple_mapv1::contains_key(&pool_info.data, &addr), error::aborted(NO_USER));
         let pool = borrow_global_mut<Pool>(@dat3);
         // Deposit staked coin
         let stake = coin::withdraw<DAT3>(sender, amount);
@@ -119,8 +128,8 @@ module dat3::dat3_stake {
     public entry fun more_duration(sender: &signer, duration: u64) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
-        assert!(coin::is_account_registered<DAT3>(addr), INVALID_ARGUMENT);
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(coin::is_account_registered<DAT3>(addr), error::permission_denied(INVALID_ARGUMENT));
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         // check user
         assert!(simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
@@ -146,10 +155,10 @@ module dat3::dat3_stake {
     {
         let addr = signer::address_of(sender);
 
-        assert!(coin::is_account_registered<DAT3>(addr), INVALID_ARGUMENT);
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool = borrow_global_mut<Pool>(@dat3);
-        assert!(duration <= pool.max_lock_time, INVALID_ARGUMENT);
+        assert!(duration <= pool.max_lock_time, error::aborted(INVALID_ARGUMENT));
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         let now = timestamp::now_seconds();
         let stake = coin::withdraw<DAT3>(sender, amount);
@@ -183,20 +192,20 @@ module dat3::dat3_stake {
     public entry fun withdraw(sender: &signer, amount: u64) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
-        assert!(amount > 0, INVALID_ARGUMENT);
-        assert!(coin::is_account_registered<DAT3>(addr), INVALID_ARGUMENT);
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(amount > 0, error::aborted(INVALID_ARGUMENT));
+        assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool = borrow_global_mut<Pool>(@dat3);
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
         let now = timestamp::now_seconds();
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
-        assert!(user.amount_staked >= amount, EINSUFFICIENT_BALANCE);
+        assert!(user.amount_staked >= amount, error::aborted(EINSUFFICIENT_BALANCE));
         if (user.duration == 0) {
             user.amount_staked = user.amount_staked - amount;
             coin::deposit(addr, coin::extract(&mut pool.stake, amount))
         }else {
-            assert!(now - (user.duration * ONE_W) >= 0, DEADLINE_ERR);
+            assert!(now - (user.duration * ONE_W) >= 0, error::aborted(DEADLINE_ERR));
             user.amount_staked = user.amount_staked - amount;
             coin::deposit(addr, coin::extract(&mut pool.stake, amount))
         };
@@ -205,8 +214,8 @@ module dat3::dat3_stake {
     /// Claim staking rewards without modifying staking position
     public entry fun claim(sender: &signer) acquires PoolInfo {
         let addr = signer::address_of(sender);
-        assert!(coin::is_account_registered<DAT3>(addr), INVALID_ARGUMENT);
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
@@ -217,10 +226,10 @@ module dat3::dat3_stake {
     /// Claim staking rewards without modifying staking position
     public fun stake_info(sender: &signer): (u64, u64, u64, u64) acquires PoolInfo {
         let addr = signer::address_of(sender);
-        assert!(coin::is_account_registered<DAT3>(addr), INVALID_ARGUMENT);
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool_info = borrow_global<PoolInfo>(@dat3);
-        assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
+        assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), error::aborted(NO_USER));
         let user = simple_mapv1::borrow(&pool_info.data, &addr);
         (user.amount_staked,
             user.start_time,
@@ -229,7 +238,7 @@ module dat3::dat3_stake {
     }
 
     public fun pool_info(): (u64, u64, u128, u128, u64) acquires Pool {
-        assert!(exists<Pool>(@dat3), INCENTIVE_POOL_NOT_FOUND);
+        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool = borrow_global<Pool>(@dat3);
 
         (coin::value<DAT3>(&pool.stake),
@@ -244,8 +253,8 @@ module dat3::dat3_stake {
     ) acquires Pool
     {
         let addr = signer::address_of(sender);
-        assert!(addr == @dat3, PERMISSION_DENIED);
-        assert!(!exists<Pool>(@dat3), ALREADY_EXISTS);
+        assert!(addr == @dat3, error::aborted(PERMISSION_DENIED));
+        assert!(!exists<Pool>(@dat3), error::aborted(ALREADY_EXISTS));
         let pool = borrow_global_mut<Pool>(@dat3);
         if (rate_of > 0) {
             pool.rate_of = rate_of;
@@ -258,13 +267,41 @@ module dat3::dat3_stake {
         };
     }
 
-    public(friend) entry fun mint_pool(
-        sender: &signer, coins: Coin<DAT3>
-    ) acquires Pool, PoolInfo
+    public(friend)  fun mint_pool(
+        sender: &signer, coins: Coin<DAT3>) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
-        assert!(addr == @dat3, PERMISSION_DENIED);
-        assert!(!exists<Pool>(@dat3), ALREADY_EXISTS);
+        assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
+        if(!exists<Pool>(addr)){
+            let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
+            let auth_signer = account::create_signer_with_capability(&module_authority);
+            let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
+                string::utf8(b"veDAT3 Coin"),
+                string::utf8(b"veDAT3"),
+                6u8, true);
+            coin::destroy_freeze_cap(freeze);
+            move_to<Pool>(sender, Pool {
+                rate_of: 3836,
+                rate_of_decimal: 10000,
+                max_lock_time: 52,
+                stake: coin::zero<DAT3>(), reward: coin::zero<DAT3>(), burn, mint,
+            });
+        };
+
+        if(!exists<PoolInfo>(addr)){
+            let s = simple_mapv1::create();
+            simple_mapv1::add(&mut s, @dat3_admin, UserPosition {
+                amount_staked: 0,
+                start_time: 0,
+                duration: 0,
+                reward: coin::zero<DAT3>(),
+            });
+
+            move_to<PoolInfo>(sender, PoolInfo {
+                data: s,
+            });
+        };
+        assert!(exists<Pool>(@dat3), error::not_found(NOT_FOUND));
         let pool = borrow_global_mut<Pool>(@dat3);
         coin::merge(&mut pool.reward, coins);
 
@@ -272,9 +309,10 @@ module dat3::dat3_stake {
         let leng = simple_mapv1::length(&mut pool_info.data);
         let volume = 0u128;
         let i = 0;
-        let users = vector::empty<&mut UserPosition>();
+        let users = vector::empty< address>();
+        //Expected a single non-reference type
         while (i < leng) {
-            let (address, user) = simple_mapv1::find_index(&mut pool_info.data, i);
+            let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
             if (user.amount_staked > 0 && user.duration > 0) {
                 // Aamount_staked *y''+Bamount_staked*y''+...Namount_staked*y''
                 //  y''=X*0.3836+1 -->(user.duration  * pool.rate_of) + 1
@@ -283,8 +321,8 @@ module dat3::dat3_stake {
                 //  100*(7672+10000)/((100*(7672+10000))+(300*(11508+10000)))
                 //  100*17672/((100*17672)+(300*21508))
                 //  0.214998 -> 720*0.214998/100  1.54 -->154%
-                volume = volume + ((user.amount_staked as u128) * ((user.duration as u128 * pool.rate_of) + pool.rate_of_decimal));
-                vector::push_back(&mut users, user)
+                volume = volume + ((user.amount_staked as u128) * (((user.duration as u128) * pool.rate_of) + pool.rate_of_decimal));
+                vector::push_back(&mut users,  *address)
             };
             i = i + 1;
         };
@@ -292,11 +330,12 @@ module dat3::dat3_stake {
         if (leng > 0) {
             let reward_val = coin::value<DAT3>(&mut pool.reward)  ;
             while (i < leng) {
-                let get = vector::borrow_mut(&mut users, i);
-                let s = (((get.amount_staked as u128) * ((get.duration as u128 * pool.rate_of) + pool.rate_of_decimal)) / volume
-                    * (reward_val as u128)) as u64;
+                let user_address = vector::borrow_mut(&mut users, i);
+               let get  =simple_mapv1::borrow_mut(&mut pool_info.data,user_address);
+                let s = ((((get.amount_staked as u128) * (((get.duration as u128) * pool.rate_of) + pool.rate_of_decimal)) / volume
+                    * (reward_val as u128)) as u64);
                 if (coin::value<DAT3>(&mut pool.reward) > 0) {
-                    coin::merge(&mut get.reward, coin::extract(&mut pool.reward, s))
+                    coin::merge(   &mut get.reward, coin::extract(&mut pool.reward, s))
                 };
             };
         };
@@ -304,28 +343,26 @@ module dat3::dat3_stake {
 
     #[view]
     public fun apy(
-        sender: &signer, amount: u64, duration: u64
+          amount: u64, duration: u64
     ): u64 acquires Pool, PoolInfo, GenesisInfo
     {
-        let addr = signer::address_of(sender);
-        assert!(!exists<Pool>(@dat3), ALREADY_EXISTS);
+        assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
         let pool = borrow_global<Pool>(@dat3);
 
-        let pool_info = borrow_global<PoolInfo>(@dat3);
+        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         let leng = simple_mapv1::length(&mut pool_info.data);
         let volume = 0u128;
         let i = 0;
-        let users = vector::empty<UserPosition>();
-        while (i < leng) {
-            let (address, user) = simple_mapv1::find_index(&mut pool_info.data, i);
-            if (user.amount_staked > 0 && user.duration > 0) {
-                volume = volume + ((user.amount_staked as u128) * ((user.duration as u128 * pool.rate_of) + pool.rate_of_decimal));
+        while (i < leng) { //Invalid mutable borrow from an immutable reference
+            let (_address, user) = simple_mapv1::find_index_mut(  &mut pool_info.data, i);
+            if (user.amount_staked > 0 && user.duration > 0 ) {
+                volume = volume + ((user.amount_staked as u128) * (((user.duration as u128) * pool.rate_of) + pool.rate_of_decimal));
             };
             i = i + 1;
         };
-        let your = (amount as u128) * ((duration as u128 * pool.rate_of) + pool.rate_of_decimal);
+        let your = (amount as u128) * ((duration as u128) * pool.rate_of) + pool.rate_of_decimal ;
         your = your / (volume + your);
-        (your * assert_mint_num() / (amount as u128) * 1000000u128) as u64
+        ((your * assert_mint_num() / (amount as u128) * 1000000u128) as u64)
     }
 
 
@@ -340,6 +377,6 @@ module dat3::dat3_stake {
             i = i + 1;
         };
         let mint = TOTAL_EMISSION / m  ;
-        return mint * math128::pow(10, coin::decimals<DAT3>() as u128)
+        return mint * math128::pow(10, (coin::decimals<DAT3>() as u128))
     }
 }

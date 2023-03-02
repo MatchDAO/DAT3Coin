@@ -1,13 +1,28 @@
 module dat3::dat3_manager {
     use std::signer;
-    use std::string;
-    use aptos_std::math64;
+    use std::string::{Self, String};
+
+    use aptos_framework::account;
     use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability, Coin};
     use aptos_framework::event;
-    use std::string::String;
-    use aptos_framework::account;
-    use aptos_framework::timestamp::now_seconds;
+    use aptos_framework::timestamp::{Self, now_seconds};
+
     use dat3::dat3_coin::DAT3;
+
+    #[test_only]
+    use aptos_std::debug;
+    #[test_only]
+    use aptos_std::math64;
+    #[test_only]
+    use aptos_framework::aptos_account::create_account;
+    #[test_only]
+    use aptos_framework::coin::is_account_registered;
+    #[test_only]
+    use aptos_framework::timestamp;
+    #[test_only]
+    use dat3::dat3_pool;
+    use aptos_std::math128;
+    use std::error;
 
     struct HodeCap has key {
         burnCap: BurnCapability<DAT3>,
@@ -70,9 +85,9 @@ module dat3::dat3_manager {
 
 
     public entry fun init_dat3_coin(owner: &signer) acquires HodeCap, MintTime, GenesisInfo {
-        assert!(signer::address_of(owner) == @dat3, PERMISSION_DENIED);
+        assert!(signer::address_of(owner) == @dat3,  error::permission_denied(PERMISSION_DENIED));
         //only once
-        assert!(!exists<GenesisInfo>(@dat3), ALREADY_EXISTS);
+        assert!(!exists<GenesisInfo>(@dat3), error::already_exists(ALREADY_EXISTS));
         let (burnCap, freezeCap, mintCap) =
             coin::initialize<DAT3>(owner,
                 string::utf8(b"DAT3 Coin"),
@@ -100,7 +115,7 @@ module dat3::dat3_manager {
     //Make sure it's only once a day
     fun assert_mint_time(): bool acquires MintTime {
         let last = borrow_global_mut<MintTime>(@dat3);
-        assert!(last.supplyAmount <= MAX_SUPPLY_AMOUNT, SUPPLY_OUT_OF_RANGE);
+        assert!(last.supplyAmount <= MAX_SUPPLY_AMOUNT, error::out_of_range(SUPPLY_OUT_OF_RANGE));
         if (last.time == 0) {
             //Genesis
             last.time = 1;
@@ -120,7 +135,7 @@ module dat3::dat3_manager {
     fun assert_mint_num(): u128 acquires MintTime, GenesisInfo {
         let last = borrow_global<MintTime>(@dat3);
         let gen = borrow_global<GenesisInfo>(@dat3);
-        assert!(last.supplyAmount <= MAX_SUPPLY_AMOUNT, SUPPLY_OUT_OF_RANGE);
+        assert!(last.supplyAmount <= MAX_SUPPLY_AMOUNT, error::out_of_range(SUPPLY_OUT_OF_RANGE));
         let now = timestamp::now_seconds();
         let year = ((now - gen.genesis_time) as u128) / SECONDS_OF_YEAR ;
         let m = 1u128;
@@ -134,45 +149,31 @@ module dat3::dat3_manager {
     }
 
     public entry fun mint_to(owner: &signer, to: address) acquires HodeCap, MintTime, GenesisInfo {
-        assert!(signer::address_of(owner) == @dat3, PERMISSION_DENIED);
+        assert!(signer::address_of(owner) == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(assert_mint_time(), ASSERT_MINT_ERR);
         let cap = borrow_global<HodeCap>(@dat3);
 
         let ds = math128::pow(10, ((coin::decimals<DAT3>()) as u128));
         let mint_num = assert_mint_num();
-        assert!(mint_num>0,ASSERT_MINT_ERR);
+        assert!(mint_num > 0, error::aborted(ASSERT_MINT_ERR));
         let mint_amount = ds * mint_num;
-        let mint_coins = coin::mint(mint_amount as u64, &cap.mintCap);
+        let mint_coins = coin::mint((mint_amount as u64), &cap.mintCap);
         dat3::dat3_pool::deposit_reward_coin(
             owner,
-            coin::extract(&mut mint_coins, (TALK_EMISSION / TOTAL_EMISSION * mint_amount) as u64)
+            coin::extract(&mut mint_coins, ((TALK_EMISSION / TOTAL_EMISSION * mint_amount) as u64))
         );
         dat3::dat3_pool::deposit_reward_coin(
             owner,
-            coin::extract(&mut mint_coins, (ACTIVE_EMISSION / TOTAL_EMISSION * mint_amount) as u64)
+            coin::extract(&mut mint_coins, ((ACTIVE_EMISSION / TOTAL_EMISSION * mint_amount) as u64))
         );
         dat3::dat3_stake::mint_pool(
             owner,
-            coin::extract(&mut mint_coins, (STAKE_EMISSION / TOTAL_EMISSION * mint_amount) as u64)
+            coin::extract(&mut mint_coins, ((STAKE_EMISSION / TOTAL_EMISSION * mint_amount) as u64))
         );
         coin::deposit(to, mint_coins);
         let last = borrow_global_mut<MintTime>(@dat3);
-        last.supplyAmount = (mint_amount as u64 )+ last.supplyAmount;
+        last.supplyAmount = (mint_amount as u64) + last.supplyAmount;
     }
-
-
-    #[test_only]
-    use aptos_framework::coin::is_account_registered;
-    #[test_only]
-    use aptos_std::debug;
-    #[test_only]
-    use aptos_framework::aptos_account::{create_account};
-    #[test_only]
-    use aptos_framework::timestamp;
-    #[test_only]
-    use dat3::dat3_pool;
-    use aptos_framework::timestamp;
-    use aptos_std::math128;
 
 
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]

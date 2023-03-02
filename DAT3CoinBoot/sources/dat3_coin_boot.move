@@ -7,6 +7,7 @@ module dat3::dat3_coin_boot {
 
     #[test_only]
     use aptos_std::debug;
+    use std::error;
 
 
     const ERR_PERMISSIONS: u64 = 403;
@@ -16,7 +17,8 @@ module dat3::dat3_coin_boot {
     struct BootResourceSignerStore has key {
         sinCap: SignerCapability,
     }
-
+    const PERMISSION_DENIED: u64 = 1000;
+    const INVALID_ARGUMENT: u64 = 105;
     /// Deploy code & store tempo resource signer
     public entry fun initializeWithResourceAccount(
         admin: &signer,
@@ -24,20 +26,19 @@ module dat3::dat3_coin_boot {
         byteCode: vector<u8>,
         seed: vector<u8>
     ) {
-        assert!(signer::address_of(admin) == @dat3, ERR_PERMISSIONS);
+        assert!(signer::address_of(admin) == @dat3, error::permission_denied(PERMISSION_DENIED));
         let (resourceSigner, sinCap) =
             account::create_resource_account(admin, seed);
 
         code::publish_package_txn(&resourceSigner, metadata, vector[byteCode]);
-
-
         move_to(admin, BootResourceSignerStore { sinCap });
     }
 
     /// Destroys temporary storage for resource account signer capability and returns signer capability.
-    /// It needs for initialization of aptospad.
+    /// It needs for initialization of .
     public fun retrieveResourceSignerCap(aptospadAdmin: &signer): SignerCapability acquires BootResourceSignerStore {
-        assert!(signer::address_of(aptospadAdmin) == @dat3, ERR_PERMISSIONS);
+        assert!(signer::address_of(aptospadAdmin) == @dat3, error::permission_denied(PERMISSION_DENIED));
+
         let BootResourceSignerStore { sinCap } = move_from<BootResourceSignerStore>(
             signer::address_of(aptospadAdmin)
         );

@@ -7,9 +7,9 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0xed1414caa93cbd5e9df64b1319417a6592559c8f9389a166c76c3a53dd23a994'
+DAT3='0x8f8dea2ef80ef63c0d9a81767afbb545ed02923970769b3ee340166dd9b8bfc8'
 PROFILE="devnet"
-echo "dat3:'0x$DAT3'" FUNCTION_RESOLUTION_FAILURE
+echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd `
 COIN_PATH="$DAT3_PATH/veDAT3Coin"
 BOOT_PATH="$DAT3_PATH/DAT3CoinBoot"
@@ -53,22 +53,28 @@ cd $DAT3Pool
 echo "aptos move compile -->  $DAT3Pool "
 echo `aptos move compile --save-metadata --package-dir  $DAT3Pool`
 echo""
-sleep 2
+sleep 5
 echo "aptos move publish --> $DAT3Pool"
 echo `aptos move publish --assume-yes --package-dir  $DAT3Pool  `
 echo""
-sleep 2
-echo "$DAT3::dat3_manager::init_dat3_coin"
+sleep 5
+echo "dat3_manager::init_dat3_coin"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_manager::init_dat3_coin`
 echo""
-sleep 2
-echo "$DAT3::dat3_pool::init_pool --type-args 0x1::aptos_coin::AptosCoin"
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool::init_pool --type-args "0x1::aptos_coin::AptosCoin" `
+echo "dat3_stake::init"
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_stake::init`
+echo""
+sleep 3
+echo " dat3_pool::init_pool "
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool::init_pool `
 echo""
 sleep 2
-echo "$DAT3::dat3_pool_routel::init"
+echo " dat3_pool_routel::init"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init`
-#sleep 2
-#echo "$DAT3::dat3_pool_routel::user_init"
-#echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::user_init --type-args "0x1::aptos_coin::AptosCoin" --args u64:12  u64:13 `
-#sleep 2
+sleep 2
+echo " dat3_pool_routel::change_sys_fid --args u64:999999999999999  bool:false"
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::change_sys_fid --args u64:999999999999999  bool:false`
+sleep 2
+echo "dat3_pool_routel::user_init"
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::user_init   --args u64:12  u64:13 `
+sleep 2

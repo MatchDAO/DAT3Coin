@@ -91,12 +91,12 @@ module dat3::simple_mapv1 {
     fun find<Key: store, Value: store>(
         map: &SimpleMapV1<Key, Value>,
         key: &Key,
-    ): option::Option<u64>{
+    ): option::Option<u64> {
         let leng = vector::length(&map.data);
         let i = 0;
         while (i < leng) {
             let element = vector::borrow(&map.data, i);
-            if (&element.key == key){
+            if (&element.key == key) {
                 return option::some(i)
             };
             i = i + 1;
@@ -105,13 +105,20 @@ module dat3::simple_mapv1 {
     }
 
     public fun find_index<Key: store, Value: store>(
-        map: &mut SimpleMapV1<Key, Value>
-        ,i:u64
-    ): (&mut Key,&mut Value )   {
-        let element = vector::borrow_mut( &mut map.data, i);
-        (&mut element.key,&mut element.value)
+        map: &SimpleMapV1<Key, Value>
+        , i: u64
+    ): (&Key, &Value) {
+        let element = vector::borrow(&map.data, i);
+        (&element.key, &element.value)
     }
 
+    public fun find_index_mut<Key: store, Value: store>(
+        map: &mut SimpleMapV1<Key, Value>,
+        i: u64,
+    ): (&Key, &mut Value) {
+        let element = vector::borrow_mut(&mut map.data, i);
+        (&element.key, &mut element.value)
+    }
 
     #[test]
     public fun add_remove_many() {

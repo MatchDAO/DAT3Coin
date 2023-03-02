@@ -1,11 +1,11 @@
 [package]
 name = 'DAT3CoinBoot'
-version = '0.0.2'
+version = '0.0.5'
 upgrade_policy = "compatible"
 
 [addresses]
-dat3 = "0xed1414caa93cbd5e9df64b1319417a6592559c8f9389a166c76c3a53dd23a994"
-dat3_admin = "0x6f1396cd716ba8d1263f96cb24dd8a41770bce2ec78afe5385956754fcd9e6dc"
+dat3 = "0x8f8dea2ef80ef63c0d9a81767afbb545ed02923970769b3ee340166dd9b8bfc8"
+dat3_admin = "0xd3bc95c03d54a8da4f217c2db468613e1c1c380678cefba9dbd263a4f9d63d7f"
 [dependencies.AptosFramework]
 local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework"
 #[addresses]
