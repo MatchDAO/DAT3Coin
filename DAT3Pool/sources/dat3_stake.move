@@ -21,6 +21,7 @@ module dat3::dat3_stake {
         start_time: u64,
         duration: u64,
         reward: Coin<DAT3>,
+        flexible:bool
     }
 
     struct PoolInfo has key, store {
@@ -46,6 +47,10 @@ module dat3::dat3_stake {
     const MAX_SUPPLY_AMOUNT: u64 = 5256000 ;
     //365
     const SECONDS_OF_YEAR: u128 = 31536000 ;
+    //365
+    const SECONDS_OF_WEEK: u128 = 604800 ;
+    //ONE DAY
+    const SECONDS_OF_DAY: u128 = 86400 ;
 
     const TOTAL_EMISSION: u128 = 7200;
 
@@ -95,6 +100,7 @@ module dat3::dat3_stake {
                 start_time: 0,
                 duration: 0,
                 reward: coin::zero<DAT3>(),
+                flexible:false
             });
 
             move_to<PoolInfo>(sender, PoolInfo {
@@ -157,6 +163,9 @@ module dat3::dat3_stake {
 
         assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
         assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
+        if (!coin::is_account_registered<VEDAT3>(addr)) {
+            coin::register<VEDAT3>(sender);
+        };
         let pool = borrow_global_mut<Pool>(@dat3);
         assert!(duration <= pool.max_lock_time, error::aborted(INVALID_ARGUMENT));
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
@@ -164,6 +173,10 @@ module dat3::dat3_stake {
         let stake = coin::withdraw<DAT3>(sender, amount);
         // Deposit staked coin
         coin::merge(&mut pool.stake, stake);
+        let flexible =false;
+        if(duration>0){
+            flexible=true;
+        };
         // Update UserPosition
         if (!simple_mapv1::contains_key(&pool_info.data, &addr)) {
             simple_mapv1::add(&mut pool_info.data, addr, UserPosition {
@@ -171,44 +184,41 @@ module dat3::dat3_stake {
                 start_time: now,
                 duration,
                 reward: coin::zero<DAT3>(),
+                flexible,
             })
         } else {
             let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
             user.amount_staked = user.amount_staked + amount;
-            if (user.duration + duration > 5) {
-                duration = 5;
+            if (user.duration + duration >= pool.max_lock_time) {
+                duration = 52;
             }else {
                 duration = user.duration + duration;
             };
+            if(duration>0){
+                flexible=false;
+            };
             user.duration = duration;
+            user.flexible=flexible;
         };
-        if (!coin::is_account_registered<VEDAT3>(addr)) {
-            coin::register<VEDAT3>(sender);
-        }
+
     }
 
     /// Withdraw stake coin from the incentive pool.
     /// All pending rewards will be transferred to `sender`.
-    public entry fun withdraw(sender: &signer, amount: u64) acquires Pool, PoolInfo
+    public entry fun withdraw(sender: &signer) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
-        assert!(amount > 0, error::aborted(INVALID_ARGUMENT));
         assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
         assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool = borrow_global_mut<Pool>(@dat3);
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
-        let now = timestamp::now_seconds();
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
-        assert!(user.amount_staked >= amount, error::aborted(EINSUFFICIENT_BALANCE));
-        if (user.duration == 0) {
-            user.amount_staked = user.amount_staked - amount;
-            coin::deposit(addr, coin::extract(&mut pool.stake, amount))
-        }else {
-            assert!(now - (user.duration * ONE_W) >= 0, error::aborted(DEADLINE_ERR));
-            user.amount_staked = user.amount_staked - amount;
-            coin::deposit(addr, coin::extract(&mut pool.stake, amount))
-        };
+        assert!(user.amount_staked > 0, error::aborted(EINSUFFICIENT_BALANCE));
+        user.amount_staked = 0;
+        user.duration = 0;
+        user.start_time = 0;
+        coin::deposit(addr, coin::extract(&mut pool.stake, user.amount_staked));
     }
 
     /// Claim staking rewards without modifying staking position
@@ -223,20 +233,8 @@ module dat3::dat3_stake {
         coin::deposit<DAT3>(addr, coin::extract_all(&mut user.reward));
     }
 
-    /// Claim staking rewards without modifying staking position
-    public fun stake_info(sender: &signer): (u64, u64, u64, u64) acquires PoolInfo {
-        let addr = signer::address_of(sender);
-        assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
-        assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
-        let pool_info = borrow_global<PoolInfo>(@dat3);
-        assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), error::aborted(NO_USER));
-        let user = simple_mapv1::borrow(&pool_info.data, &addr);
-        (user.amount_staked,
-            user.start_time,
-            user.duration,
-            coin::value<DAT3>(&user.reward))
-    }
 
+    #[view]
     public fun pool_info(): (u64, u64, u128, u128, u64) acquires Pool {
         assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool = borrow_global<Pool>(@dat3);
@@ -295,6 +293,7 @@ module dat3::dat3_stake {
                 start_time: 0,
                 duration: 0,
                 reward: coin::zero<DAT3>(),
+                flexible:false,
             });
 
             move_to<PoolInfo>(sender, PoolInfo {
@@ -308,69 +307,389 @@ module dat3::dat3_stake {
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         let leng = simple_mapv1::length(&mut pool_info.data);
         let volume = 0u128;
+        let volume_staked = 0u128;
         let i = 0;
         let users = vector::empty<address>();
         //Expected a single non-reference type
+        let now = timestamp::now_seconds();
         while (i < leng) {
             let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
-            if (user.amount_staked > 0 && user.duration > 0) {
-                // Aamount_staked *y''+Bamount_staked*y''+...Namount_staked*y''
-                //  y''=X*0.3836+1 -->(user.duration  * pool.rate_of) + 1
-                //   A:100,2 B300,3
-                //  (100*(2*3836+10000)) /((100*(2*3836+10000))+(300*(3*3836+10000)))
-                //  100*(7672+10000)/((100*(7672+10000))+(300*(11508+10000)))
-                //  100*17672/((100*17672)+(300*21508))
-                //  0.214998 -> 720*0.214998/100  1.54 -->154%
-                volume = volume + ((user.amount_staked as u128) * (((user.duration as u128) * pool.rate_of) + pool.rate_of_decimal));
+            //   this is passed
+            let passed = ((((now as u128) - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
+            // check amount_staked,check duration ，check
+            if (user.amount_staked > 0 && user.duration > 0 && user.duration > passed) {
+                volume = volume + ((user.amount_staked as u128) * ((((user.duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal));
+                volume_staked = volume_staked + (user.amount_staked as u128);
                 vector::push_back(&mut users, *address)
             };
             i = i + 1;
         };
         leng = vector::length(&users);
         if (leng > 0) {
+            i = 0;
             let reward_val = coin::value<DAT3>(&mut pool.reward)  ;
             while (i < leng) {
                 let user_address = vector::borrow_mut(&mut users, i);
                 let get = simple_mapv1::borrow_mut(&mut pool_info.data, user_address);
-                let s = (((reward_val as u128) * ((get.amount_staked as u128) * (((get.duration as u128) * pool.rate_of) + pool.rate_of_decimal)) / volume
+                let passed = ((((now as u128) - (get.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
+
+                let award = (((reward_val as u128) * ((get.amount_staked as u128) * ((((get.duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal)) / volume
                 ) as u64);
                 if (coin::value<DAT3>(&mut pool.reward) > 0) {
-                    coin::merge(&mut get.reward, coin::extract(&mut pool.reward, s))
+                    coin::merge(&mut get.reward, coin::extract(&mut pool.reward, award))
                 };
+                i = i + 1;
             };
         };
     }
 
     #[view]
-    public fun apy(
-        amount: u64, duration: u64
-    ): u64 acquires Pool, PoolInfo, GenesisInfo
+    public fun apr(
+        staking: u64, duration: u64
+    ): (u64, u64, u64, bool, u64, u64, u64, u64,u64,u64 ) acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
-        let pool = borrow_global<Pool>(@dat3);
 
+        let vedat3 = 0u64;
+        let staking = staking; //done
+        let duration =duration; //done
+        let flexible =false; //done
+        let apr = 0u64;
+        let roi=0u64;
+        let boost = 0 ;   //done
+        let start = 0u64; //done
+        let rewards = 0u64;//done
+        let total_staking = 0u64;
+
+        if(duration>0){
+            flexible=true;
+        };
+
+        let pool = borrow_global<Pool>(@dat3);
+        //all staking
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
+
+        boost=  pool.rate_of_decimal ;
         let leng = simple_mapv1::length(&mut pool_info.data);
-        let volume = 0u128;
-        let i = 0;
+        let now = timestamp::now_seconds();
+        start=now;
+        //temporary container
+        let users = vector::empty<address>();
+
+        //index
+        let i = 0u64;
         while (i < leng) {
-            //Invalid mutable borrow from an immutable reference
-            let (_address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
-            if (user.amount_staked > 0 && user.duration > 0) {
-                volume = volume + ((user.amount_staked as u128) * (((user.duration as u128) * pool.rate_of) + pool.rate_of_decimal));
+            let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
+            //   this is passed
+            let passed = ((((now as u128) - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
+            // check amount_staked,check duration ，check
+            if (user.amount_staked > 0   && (user.duration > passed ||user.flexible)) {
+                //All users who are staking
+                total_staking = total_staking + user.amount_staked;
+                vector::push_back(&mut users, *address)
             };
             i = i + 1;
         };
-        let your = (amount as u128) * ((duration as u128) * pool.rate_of) + pool.rate_of_decimal ;
-        your = your * assert_mint_num() * 1000000u128 / (volume + your);
-        ((your / (amount as u128)) as u64)
+        //genesis_time
+        let gen = borrow_global<GenesisInfo>(@dat3);
+        //simulate_mint time
+        let time = (now as u128);
+        i = 0;
+        let maximum = duration * 7 + 1;
+        if(flexible){
+            maximum=8;
+        };
+        let all_simulate_reward = 0u128;
+        //Calculate the daily
+        while (i < maximum) {
+            leng = vector::length(&users);
+            let j = 0u64;
+            //simulate mint
+            let mint = simulate_mint(gen.genesis_time, (time as u64));
+            let volume = 0u128;
+            let passed = (((time - (now as u128)) / SECONDS_OF_WEEK) as u64);
+            //add your stake factor
+            let your_stake_factor = (staking as u128) * ((((duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal) ;
+            //reset daily stake factor
+            volume = your_stake_factor;
+            if (leng > 0) {
+                while (j < leng) {
+                    let add_j = vector::borrow(&users, j);
+                    let temp_user = simple_mapv1::borrow(&pool_info.data, add_j);
+                    // duration
+                    if (duration > passed||temp_user.flexible ) {
+                        passed = (((time - (temp_user.start_time as u128)) / SECONDS_OF_WEEK) as u64);
+                        if ((temp_user.duration > passed)||temp_user.flexible) {
+                            volume = volume + ((temp_user.amount_staked as u128) * ((((temp_user.duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal));
+                        }else {
+                            vector::swap_remove(&mut users, j)  ;
+                            j = j - 1;
+                            if ((leng - j) > 1) {
+                                leng = leng - 1;
+                            };
+                        };
+                    };
+                    j = j + 1;
+                };
+                all_simulate_reward = all_simulate_reward + mint * your_stake_factor / volume;
+            };
+            time = time + SECONDS_OF_DAY;
+            i = i + 1;
+        };
+        apr = ((all_simulate_reward * 1000000 / (staking as u128) as u64));
+        rewards = (all_simulate_reward as u64);
+        // let vedat3 = 0u64;
+        // let staking = 0u64; //done
+        // let duration = 0u64; //done
+        // let flexible =false; //done
+        // let apr = 0u64;
+        // let roi=0u64;
+        // let boost = 0 ;   //done
+        // let start = 0u64; //done
+        // let rewards = 0u64;//done
+        // let current_rewards = 0u64;//done
+        (vedat3, staking, duration,flexible,apr,roi,( boost as u64),start,rewards ,total_staking )
+    }
+    #[view]
+    public fun your_staking(
+        addr:address
+    ): (u64, u64, u64, bool, u64, u64, u64, u64,u64,u64,u64 ) acquires Pool, PoolInfo, GenesisInfo
+    {
+        assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
+
+        let vedat3 = 0u64;
+        let staking = 0u64; //done
+        let duration = 0u64; //done
+        let flexible =false; //done
+        let apr = 0u64;
+        let roi=0u64;
+        let boost = 0 ;   //done
+        let start = 0u64; //done
+        let rewards = 0u64;//done
+        let current_rewards = 0u64;//done
+
+        let total_staking = 0u64;
+
+        let pool = borrow_global<Pool>(@dat3);
+        //all staking
+        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
+
+        let your_s=simple_mapv1::borrow(&pool_info.data,*addr);
+        duration=your_s.duration;
+        staking=your_s.amount_staked;
+        flexible=your_s.flexible;
+        current_rewards=coin::value<DAT3>(&mut your_s.reward);
+        start = your_s.start_time;
+        boost=  pool.rate_of_decimal ;
+        let leng = simple_mapv1::length(&mut pool_info.data);
+        let now = timestamp::now_seconds();
+
+        //temporary container
+        let users = vector::empty<address>();
+
+        //index
+        let i = 0u64;
+        while (i < leng) {
+            let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
+            //   this is passed
+            let passed = ((((now as u128) - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
+            // check amount_staked,check duration ，check
+            if (user.amount_staked > 0   && (user.duration > passed ||user.flexible)) {
+                //All users who are staking
+                total_staking = total_staking + user.amount_staked;
+                vector::push_back(&mut users, *address)
+            };
+            i = i + 1;
+        };
+        //genesis_time
+        let gen = borrow_global<GenesisInfo>(@dat3);
+        //simulate_mint time
+        let time = (now as u128);
+        i = 0;
+        let maximum = duration * 7 + 1;
+        if(flexible){
+            maximum=8;
+        };
+        let all_simulate_reward = 0u128;
+        //Calculate the daily
+        while (i < maximum) {
+            leng = vector::length(&users);
+            let j = 0u64;
+            //simulate mint
+            let mint = simulate_mint(gen.genesis_time, (time as u64));
+            let volume = 0u128;
+            let passed = (((time - (now as u128)) / SECONDS_OF_WEEK) as u64);
+            //add your stake factor
+            let your_stake_factor = (staking as u128) * ((((duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal) ;
+            //reset daily stake factor
+            volume = your_stake_factor;
+            if (leng > 0) {
+                while (j < leng) {
+                    let add_j = vector::borrow(&users, j);
+                    let temp_user = simple_mapv1::borrow(&pool_info.data, add_j);
+                    // duration
+                    if ((duration > passed||temp_user.flexible) && *add_j!=addr ) {
+                        passed = (((time - (temp_user.start_time as u128)) / SECONDS_OF_WEEK) as u64);
+                        if ((temp_user.duration > passed)||temp_user.flexible) {
+                            volume = volume + ((temp_user.amount_staked as u128) * ((((temp_user.duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal));
+                        }else {
+                            vector::swap_remove(&mut users, j)  ;
+                            j = j - 1;
+                            if ((leng - j) > 1) {
+                                leng = leng - 1;
+                            };
+                        };
+                    };
+                    j = j + 1;
+                };
+                all_simulate_reward = all_simulate_reward + mint * your_stake_factor / volume;
+            };
+            time = time + SECONDS_OF_DAY;
+            i = i + 1;
+        };
+        apr = ((all_simulate_reward * 1000000 / (staking as u128) as u64));
+        rewards = (all_simulate_reward as u64);
+        // let vedat3 = 0u64;
+        // let staking = 0u64; //done
+        // let duration = 0u64; //done
+        // let flexible =false; //done
+        // let apr = 0u64;
+        // let roi=0u64;
+        // let boost = 0 ;   //done
+        // let start = 0u64; //done
+        // let rewards = 0u64;//done
+        // let current_rewards = 0u64;//done
+        (vedat3, staking, duration,flexible,apr,roi,( boost as u64),start,rewards,current_rewards ,total_staking )
     }
 
+    #[view]
+    public fun your_staking_more(
+        addr:address,staking_more:u64,duration_more:u64
+    ): (u64, u64, u64, bool, u64, u64, u64, u64,u64,u64,u64 ) acquires Pool, PoolInfo, GenesisInfo
+    {
+        assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
+
+        let vedat3 = 0u64;
+        let staking = 0u64; //done
+        let duration = 0u64; //done
+        let flexible =false; //done
+        let apr = 0u64;
+        let roi=0u64;
+        let boost = 0 ;   //done
+        let start = 0u64; //done
+        let rewards = 0u64;//done
+        let current_rewards = 0u64;//done
+
+        let total_staking = 0u64;
+
+        let pool = borrow_global<Pool>(@dat3);
+        //all staking
+        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
+
+        let your_s=simple_mapv1::borrow(&pool_info.data,*addr);
+        duration=your_s.duration+duration_more;
+        staking=your_s.amount_staked+staking_more;
+        flexible=your_s.flexible;
+        current_rewards=coin::value<DAT3>(&mut your_s.reward);
+        start = your_s.start_time;
+        boost=  pool.rate_of_decimal ;
+        let leng = simple_mapv1::length(&mut pool_info.data);
+        let now = timestamp::now_seconds();
+
+        //temporary container
+        let users = vector::empty<address>();
+
+        //index
+        let i = 0u64;
+        while (i < leng) {
+            let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
+            //   this is passed
+            let passed = ((((now as u128) - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
+            // check amount_staked,check duration ，check
+            if (user.amount_staked > 0   && (user.duration > passed ||user.flexible)) {
+                //All users who are staking
+                total_staking = total_staking + user.amount_staked;
+                vector::push_back(&mut users, *address)
+            };
+            i = i + 1;
+        };
+        //genesis_time
+        let gen = borrow_global<GenesisInfo>(@dat3);
+        //simulate_mint time
+        let time = (now as u128);
+        i = 0;
+        let maximum = duration * 7 + 1;
+        if(flexible){
+            maximum=8;
+        };
+        let all_simulate_reward = 0u128;
+        //Calculate the daily
+        while (i < maximum) {
+            leng = vector::length(&users);
+            let j = 0u64;
+            //simulate mint
+            let mint = simulate_mint(gen.genesis_time, (time as u64));
+            let volume = 0u128;
+            let passed = (((time - (now as u128)) / SECONDS_OF_WEEK) as u64);
+            //add your stake factor
+            let your_stake_factor = (staking as u128) * ((((duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal) ;
+            //reset daily stake factor
+            volume = your_stake_factor;
+            if (leng > 0) {
+                while (j < leng) {
+                    let add_j = vector::borrow(&users, j);
+                    let temp_user = simple_mapv1::borrow(&pool_info.data, add_j);
+                    // duration
+                    if ((duration > passed||temp_user.flexible) && *add_j!=addr ) {
+                        passed = (((time - (temp_user.start_time as u128)) / SECONDS_OF_WEEK) as u64);
+                        if ((temp_user.duration > passed)||temp_user.flexible) {
+                            volume = volume + ((temp_user.amount_staked as u128) * ((((temp_user.duration - passed) as u128) * pool.rate_of) + pool.rate_of_decimal));
+                        }else {
+                            vector::swap_remove(&mut users, j)  ;
+                            j = j - 1;
+                            if ((leng - j) > 1) {
+                                leng = leng - 1;
+                            };
+                        };
+                    };
+                    j = j + 1;
+                };
+                all_simulate_reward = all_simulate_reward + mint * your_stake_factor / volume;
+            };
+            time = time + SECONDS_OF_DAY;
+            i = i + 1;
+        };
+        apr = ((all_simulate_reward * 1000000 / (staking as u128) as u64));
+        rewards = (all_simulate_reward as u64);
+        // let vedat3 = 0u64;
+        // let staking = 0u64; //done
+        // let duration = 0u64; //done
+        // let flexible =false; //done
+        // let apr = 0u64;
+        // let roi=0u64;
+        // let boost = 0 ;   //done
+        // let start = 0u64; //done
+        // let rewards = 0u64;//done
+        // let current_rewards = 0u64;//done
+        (vedat3, staking, duration,flexible,apr,roi,( boost as u64),start,rewards,current_rewards ,total_staking )
+    }
 
     fun assert_mint_num(): u128 acquires GenesisInfo {
         let gen = borrow_global<GenesisInfo>(@dat3);
         let now = timestamp::now_seconds();
         let year = ((now - gen.genesis_time) as u128) / SECONDS_OF_YEAR ;
+        let m = 1u128;
+        let i = 0u128;
+        while (i < year) {
+            m = m * 2;
+            i = i + 1;
+        };
+        let mint = TOTAL_EMISSION / m  ;
+        return mint * math128::pow(10, (coin::decimals<DAT3>() as u128))
+    }
+
+    fun simulate_mint(genesis_time: u64, now: u64): u128 {
+        let year = ((now - genesis_time) as u128) / SECONDS_OF_YEAR ;
         let m = 1u128;
         let i = 0u128;
         while (i < year) {

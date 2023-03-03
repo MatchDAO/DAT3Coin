@@ -36,10 +36,12 @@ module dat3::dat3_pool_routel {
     struct FidStore has key, store {
         data: SimpleMapV1<u64, u64>,
     }
-    struct FidResult   {
+
+    struct FidResult {
         fid: u64,
         val: u64,
     }
+
     struct Room has key, store {
         addr: address,
         started_at: u64,
@@ -74,6 +76,7 @@ module dat3::dat3_pool_routel {
     const INVALID_REQUESTER: u64 = 304;
     const INVALID_ROOM_STATE: u64 = 305;
 
+    const INVALID_ID :u64 =400;
     struct CapHode has key {
         sigCap: SignerCapability,
     }
@@ -114,7 +117,7 @@ module dat3::dat3_pool_routel {
     }
 
     public entry fun user_init(account: &signer, fid: u64, uid: u64)
-    acquires UsersReward, UsersTotalConsumption
+    acquires UsersReward, UsersTotalConsumption, FidStore
     {
         let user_address = signer::address_of(account);
         // todo check fid
@@ -132,8 +135,8 @@ module dat3::dat3_pool_routel {
         if (!simple_mapv1::contains_key(&user_t.data, &user_address)) {
             simple_mapv1::add(&mut user_t.data, user_address, 0);
         };
-        if (coin::is_account_registered<0x1::aptos_coin::AptosCoin >(user_address)) {
-            coin::register<0x1::aptos_coin::AptosCoin >(account);
+        if (coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
+            coin::register<0x1::aptos_coin::AptosCoin>(account);
         };
         move_to(account, Member {
             uid,
@@ -145,17 +148,16 @@ module dat3::dat3_pool_routel {
     }
 
     #[view]
-    public fun fee_of_mine(user: &signer): (u64, u64) acquires FeeStore, Member {
-        let user_addr = signer::address_of(user);
-        assert!(exists<Member>(user_addr), error::not_found(NO_USER));
+    public fun fee_of_mine(user: address): (u64, u64) acquires FeeStore, Member {
+        assert!(exists<Member>(user), error::not_found(NO_USER));
 
-        let is_me = borrow_global<Member>(user_addr);
+        let is_me = borrow_global<Member>(user);
         let fee = borrow_global<FeeStore>(@dat3);
         (is_me.mFee, *simple_mapv1::borrow(&fee.mFee, &is_me.mFee))
     }
 
     //Transaction Executed and Committed with Error INVALID MAIN FUNCTION SIGNATURE
-    public entry fun change_my_fee(user: &signer, grade: u64) acquires  Member {
+    public entry fun change_my_fee(user: &signer, grade: u64) acquires Member {
         let user_address = signer::address_of(user);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
@@ -164,60 +166,59 @@ module dat3::dat3_pool_routel {
         is_me.mFee = grade;
     }
 
-    public entry fun change_sys_fee(user: &signer, grade: u64, fee: u64,cfee:u64) acquires FeeStore {
+    public entry fun change_sys_fee(user: &signer, grade: u64, fee: u64, cfee: u64) acquires FeeStore {
         let user_address = signer::address_of(user);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
         assert!(fee > 0, error::out_of_range(OUT_OF_RANGE));
         let fee_s = borrow_global_mut<FeeStore>(@dat3);
-        if(cfee>0){
-            fee_s.chatFee=cfee;
+        if (cfee > 0) {
+            fee_s.chatFee = cfee;
         };
-        if(grade>0){
+        if (grade > 0) {
             let old_fee = simple_mapv1::borrow_mut(&mut fee_s.mFee, &grade);
             *old_fee = fee;
         };
-
     }
 
-    public entry fun change_sys_fid(user: &signer, fid: u64, del:bool) acquires FidStore {
+    public entry fun change_sys_fid(user: &signer, fid: u64, del: bool) acquires FidStore {
         let user_address = signer::address_of(user);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(exists<FidStore>(@dat3), error::permission_denied(PERMISSION_DENIED));
-       let f= borrow_global_mut<FidStore>(@dat3);
+        let f = borrow_global_mut<FidStore>(@dat3);
 
-       let contains=  simple_mapv1::contains_key(&f.data,&fid);
-        if(contains){
-            if(del){
-                let fvalue=simple_mapv1::borrow(&f.data,&fid );
-                assert!(*fvalue==0,error::permission_denied(ALREADY_EXISTS));
-                simple_mapv1::remove(&mut f.data,&fid);
+        let contains = simple_mapv1::contains_key(&f.data, &fid);
+        if (contains) {
+            if (del) {
+                let fvalue = simple_mapv1::borrow(&f.data, &fid);
+                assert!(*fvalue == 0, error::permission_denied(ALREADY_EXISTS));
+                simple_mapv1::remove(&mut f.data, &fid);
             };
-
         }else {
-            if(!del){
-                simple_mapv1::add(&mut f.data,fid,0);
+            if (!del) {
+                simple_mapv1::add(&mut f.data, fid, 0);
             };
         };
-
     }
+
     #[view]
-    public fun  fid_reward(  ):vector<FidResult> acquires FidStore {
+    public fun fid_reward(): vector<FidResult> acquires FidStore {
         assert!(exists<FidStore>(@dat3), error::not_found(NOT_FOUND));
-        let f= borrow_global<FidStore>(@dat3);
+        let f = borrow_global<FidStore>(@dat3);
 
         //
         let leng = simple_mapv1::length(&f.data);
         let i = 0;
-        let fids = vector::empty< FidResult>();
+        let fids = vector::empty<FidResult>();
         //Expected a single non-reference type
         while (i < leng) {
-           let (fid,val)= simple_mapv1::find_index(  &f.data ,i );
-            vector::push_back(&mut fids, FidResult{fid: *fid,val: *val} );
-            i=i+1;
+            let (fid, val) = simple_mapv1::find_index(&f.data, i);
+            vector::push_back(&mut fids, FidResult { fid: *fid, val: *val });
+            i = i + 1;
         };//Invalid mutable borrow from an immutable reference
         fids
     }
+
     #[view]
     public fun fee_of_all()
     : (u64, vector<u64>) acquires FeeStore
@@ -232,30 +233,31 @@ module dat3::dat3_pool_routel {
         (fee.chatFee, vl)
     }
 
-    fun cheak_fid(fid: u64): bool {
-        assert!(fid > 0, error::invalid_argument(INVALID_ARGUMENT));
-        true
+    fun cheak_fid(fid: u64): bool acquires FidStore {
+        assert!(fid > 0, error::invalid_argument(INVALID_ID));
+        let fs = borrow_global<FidStore>(@dat3);
+        simple_mapv1::contains_key(&fs.data, &fid)
     }
 
     // deposit token
-    public entry fun deposit (account: &signer, amount: u64) acquires Member {
+    public entry fun deposit(account: &signer, amount: u64) acquires Member {
         let user_address = signer::address_of(account);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         let auser = borrow_global_mut<Member>(user_address);
         let user_amount = auser.amount;
         auser.amount = user_amount + amount;
-        dat3_pool::deposit (account, amount);
+        dat3_pool::deposit(account, amount);
     }
 
     //Move compilation failed:
-    public entry fun withdraw (account: &signer, amount: u64) acquires Member {
+    public entry fun withdraw(account: &signer, amount: u64) acquires Member {
         let user_address = signer::address_of(account);
         assert!(exists<Member>(user_address), error::not_found(NO_USER));
         let auser = borrow_global_mut<Member>(user_address);
         let user_amount = auser.amount;
         assert!(user_amount > amount, error::out_of_range(EINSUFFICIENT_BALANCE));
         auser.amount = user_amount - amount;
-        dat3_pool::withdraw (user_address, amount);
+        dat3_pool::withdraw(user_address, amount);
     }
 
     public entry fun call_1(account: &signer, to: address) acquires Member, FeeStore, UsersTotalConsumption {
@@ -302,14 +304,13 @@ module dat3::dat3_pool_routel {
     }
 
     #[view]
-    public fun balance_of(account: &signer): (u64, u64) acquires Member, UsersReward {
-        let user_address = signer::address_of(account);
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
-        let user = borrow_global<Member>(user_address) ;
+    public fun balance_of(addr: address): (u64, u64) acquires Member, UsersReward {
+        assert!(exists<Member>(addr), error::not_found(NO_USER));
+        let user = borrow_global<Member>(addr) ;
         let user_r = borrow_global<UsersReward>(@dat3);
         let your: u64 = 0;
-        if (simple_mapv1::contains_key(&user_r.data, &user_address)) {
-            your = *simple_mapv1::borrow(&user_r.data, &user_address);
+        if (simple_mapv1::contains_key(&user_r.data, &addr)) {
+            your = *simple_mapv1::borrow(&user_r.data, &addr);
         };
         (user.amount, your)
     }

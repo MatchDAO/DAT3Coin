@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x8f8dea2ef80ef63c0d9a81767afbb545ed02923970769b3ee340166dd9b8bfc8'
+DAT3='0x55be7202d4f411d94be0a09beb7be994504f05cff8c1b26114e6a34f05ebee3d'
 PROFILE="devnet"
 echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd `
@@ -18,7 +18,7 @@ DAT3Pool="$DAT3_PATH/DAT3Pool"
 cd $BOOT_PATH
 echo " step 1 :bigin compile&publish boot :  -->`pwd`"
 echo "`ls`"
-echo `aptos move compile --package-dir "$BOOT_PATH"`
+echo `aptos move compile --package-dir "$BOOT_PATH" `
 
 echo "aptos move publish -->  $BOOT_PATH  "
 echo `aptos move publish --assume-yes --package-dir "$BOOT_PATH" `
@@ -50,12 +50,12 @@ echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin_boot::initial
 sleep 2
 echo""
 cd $DAT3Pool
-echo "aptos move compile -->  $DAT3Pool "
-echo `aptos move compile --save-metadata --package-dir  $DAT3Pool`
+echo "aptos move compile -->  $DAT3Pool --bytecode-version 6 "
+echo `aptos move compile --save-metadata --package-dir  $DAT3Pool --bytecode-version 6`
 echo""
 sleep 5
-echo "aptos move publish --> $DAT3Pool"
-echo `aptos move publish --assume-yes --package-dir  $DAT3Pool  `
+echo "aptos move publish --> $DAT3Pool --bytecode-version 6 "
+echo `aptos move publish --assume-yes --package-dir  $DAT3Pool --bytecode-version 6 `
 echo""
 sleep 5
 echo "dat3_manager::init_dat3_coin"
@@ -76,5 +76,5 @@ echo " dat3_pool_routel::change_sys_fid --args u64:999999999999999  bool:false"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::change_sys_fid --args u64:999999999999999  bool:false`
 sleep 2
 echo "dat3_pool_routel::user_init"
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::user_init   --args u64:12  u64:13 `
+echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::user_init   --args u64:999999999999999  u64:13 `
 sleep 2

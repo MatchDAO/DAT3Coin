@@ -8,17 +8,20 @@ module dat3::dat3_coin_boot {
     #[test_only]
     use aptos_std::debug;
     use std::error;
+    #[test_only]
+    use std::vector;
 
 
     const ERR_PERMISSIONS: u64 = 403;
 
 
-
     struct BootResourceSignerStore has key {
         sinCap: SignerCapability,
     }
+
     const PERMISSION_DENIED: u64 = 1000;
     const INVALID_ARGUMENT: u64 = 105;
+
     /// Deploy code & store tempo resource signer
     public entry fun initializeWithResourceAccount(
         admin: &signer,
@@ -54,19 +57,40 @@ module dat3::dat3_coin_boot {
         let sig = account::create_signer_with_capability(&signer_cap);
         debug::print(&signer::address_of(dat3));
         debug::print(&signer::address_of(&sig));
-        let year =50u128 /50;
-        let m=1u128;
-
-        let i=0u128;
+        //mint
+        let year = 50u128 / 50;
+        let m = 1u128;
+        let i = 0u128;
         while (i < year) {
-             m=m*2;
-            i=i+1;
+            m = m * 2;
+            i = i + 1;
         };
-        debug::print(&m );
-       let mint= (((7200 as u128) / m ) as u64);
-        debug::print(&mint );
+        debug::print(&m);
+        let mint = (((7200 as u128) / m) as u64);
+        debug::print(&mint);
+        let uuuu = vector::empty<u64>();
+        vector::push_back(&mut uuuu, 1);
+        vector::push_back(&mut uuuu, 2);
+        vector::push_back(&mut uuuu, 3);
+        vector::push_back(&mut uuuu, 4);
+        vector::push_back(&mut uuuu, 5);
+        vector::push_back(&mut uuuu, 6);
+        let leng = vector::length(&uuuu);
+        let j = 0u64;
+        while (j < leng) {
+            let temp = vector::borrow(&uuuu, j);
+            let os=*temp;
+            if ((*temp as u128) % 2== 0) {
+                vector::swap_remove(&mut uuuu, j);
+                j = j - 1;
+                if ((leng - j) > 1) {
+                    leng = leng - 1;
+                };
+            };
+            debug::print(&os);
+            debug::print(&uuuu);
+            j = j + 1;
+        };
 
-
-        // return sig
     }
 }
