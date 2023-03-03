@@ -72,7 +72,7 @@ module dat3::dat3_stake {
         assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(!exists<GenesisInfo>(@dat3), error::not_found(NOT_FOUND));
 
-        if(!exists<Pool>(addr)){
+        if (!exists<Pool>(addr)) {
             let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
             let auth_signer = account::create_signer_with_capability(&module_authority);
             let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
@@ -88,7 +88,7 @@ module dat3::dat3_stake {
             });
         };
 
-        if(!exists<PoolInfo>(addr)){
+        if (!exists<PoolInfo>(addr)) {
             let s = simple_mapv1::create();
             simple_mapv1::add(&mut s, @dat3_admin, UserPosition {
                 amount_staked: 0,
@@ -267,12 +267,12 @@ module dat3::dat3_stake {
         };
     }
 
-    public(friend)  fun mint_pool(
+    public(friend) fun mint_pool(
         sender: &signer, coins: Coin<DAT3>) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
         assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
-        if(!exists<Pool>(addr)){
+        if (!exists<Pool>(addr)) {
             let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
             let auth_signer = account::create_signer_with_capability(&module_authority);
             let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
@@ -288,7 +288,7 @@ module dat3::dat3_stake {
             });
         };
 
-        if(!exists<PoolInfo>(addr)){
+        if (!exists<PoolInfo>(addr)) {
             let s = simple_mapv1::create();
             simple_mapv1::add(&mut s, @dat3_admin, UserPosition {
                 amount_staked: 0,
@@ -309,7 +309,7 @@ module dat3::dat3_stake {
         let leng = simple_mapv1::length(&mut pool_info.data);
         let volume = 0u128;
         let i = 0;
-        let users = vector::empty< address>();
+        let users = vector::empty<address>();
         //Expected a single non-reference type
         while (i < leng) {
             let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
@@ -322,7 +322,7 @@ module dat3::dat3_stake {
                 //  100*17672/((100*17672)+(300*21508))
                 //  0.214998 -> 720*0.214998/100  1.54 -->154%
                 volume = volume + ((user.amount_staked as u128) * (((user.duration as u128) * pool.rate_of) + pool.rate_of_decimal));
-                vector::push_back(&mut users,  *address)
+                vector::push_back(&mut users, *address)
             };
             i = i + 1;
         };
@@ -331,11 +331,11 @@ module dat3::dat3_stake {
             let reward_val = coin::value<DAT3>(&mut pool.reward)  ;
             while (i < leng) {
                 let user_address = vector::borrow_mut(&mut users, i);
-               let get  =simple_mapv1::borrow_mut(&mut pool_info.data,user_address);
-                let s = ((((get.amount_staked as u128) * (((get.duration as u128) * pool.rate_of) + pool.rate_of_decimal)) / volume
-                    * (reward_val as u128)) as u64);
+                let get = simple_mapv1::borrow_mut(&mut pool_info.data, user_address);
+                let s = (((reward_val as u128) * ((get.amount_staked as u128) * (((get.duration as u128) * pool.rate_of) + pool.rate_of_decimal)) / volume
+                ) as u64);
                 if (coin::value<DAT3>(&mut pool.reward) > 0) {
-                    coin::merge(   &mut get.reward, coin::extract(&mut pool.reward, s))
+                    coin::merge(&mut get.reward, coin::extract(&mut pool.reward, s))
                 };
             };
         };
@@ -343,7 +343,7 @@ module dat3::dat3_stake {
 
     #[view]
     public fun apy(
-          amount: u64, duration: u64
+        amount: u64, duration: u64
     ): u64 acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
@@ -353,16 +353,17 @@ module dat3::dat3_stake {
         let leng = simple_mapv1::length(&mut pool_info.data);
         let volume = 0u128;
         let i = 0;
-        while (i < leng) { //Invalid mutable borrow from an immutable reference
-            let (_address, user) = simple_mapv1::find_index_mut(  &mut pool_info.data, i);
-            if (user.amount_staked > 0 && user.duration > 0 ) {
+        while (i < leng) {
+            //Invalid mutable borrow from an immutable reference
+            let (_address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
+            if (user.amount_staked > 0 && user.duration > 0) {
                 volume = volume + ((user.amount_staked as u128) * (((user.duration as u128) * pool.rate_of) + pool.rate_of_decimal));
             };
             i = i + 1;
         };
         let your = (amount as u128) * ((duration as u128) * pool.rate_of) + pool.rate_of_decimal ;
-        your = your / (volume + your);
-        ((your * assert_mint_num() / (amount as u128) * 1000000u128) as u64)
+        your = your * assert_mint_num() * 1000000u128 / (volume + your);
+        ((your / (amount as u128)) as u64)
     }
 
 

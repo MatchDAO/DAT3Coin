@@ -85,7 +85,7 @@ module dat3::dat3_manager {
 
 
     public entry fun init_dat3_coin(owner: &signer) acquires HodeCap, MintTime, GenesisInfo {
-        assert!(signer::address_of(owner) == @dat3,  error::permission_denied(PERMISSION_DENIED));
+        assert!(signer::address_of(owner) == @dat3, error::permission_denied(PERMISSION_DENIED));
         //only once
         assert!(!exists<GenesisInfo>(@dat3), error::already_exists(ALREADY_EXISTS));
         let (burnCap, freezeCap, mintCap) =
@@ -160,15 +160,15 @@ module dat3::dat3_manager {
         let mint_coins = coin::mint((mint_amount as u64), &cap.mintCap);
         dat3::dat3_pool::deposit_reward_coin(
             owner,
-            coin::extract(&mut mint_coins, ((TALK_EMISSION / TOTAL_EMISSION * mint_amount) as u64))
+            coin::extract(&mut mint_coins, ((mint_amount * TALK_EMISSION / TOTAL_EMISSION) as u64))
         );
         dat3::dat3_pool::deposit_reward_coin(
             owner,
-            coin::extract(&mut mint_coins, ((ACTIVE_EMISSION / TOTAL_EMISSION * mint_amount) as u64))
+            coin::extract(&mut mint_coins, ((mint_amount * ACTIVE_EMISSION / TOTAL_EMISSION) as u64))
         );
         dat3::dat3_stake::mint_pool(
             owner,
-            coin::extract(&mut mint_coins, ((STAKE_EMISSION / TOTAL_EMISSION * mint_amount) as u64))
+            coin::extract(&mut mint_coins, ((mint_amount * STAKE_EMISSION / TOTAL_EMISSION) as u64))
         );
         coin::deposit(to, mint_coins);
         let last = borrow_global_mut<MintTime>(@dat3);
@@ -194,7 +194,7 @@ module dat3::dat3_manager {
         create_account(addr);
         create_account(to_addr);
         init_dat3_coin(dat3);
-        dat3_pool::init_pool<DAT3>(dat3);
+        dat3_pool::init_pool(dat3);
         coin::register<DAT3>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
         coin::register<DAT3>(to);
