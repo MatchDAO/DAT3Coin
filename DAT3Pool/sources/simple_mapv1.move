@@ -113,10 +113,10 @@ module dat3::simple_mapv1 {
     }
 
     public fun find_index_mut<Key: store, Value: store>(
-        map: &mut SimpleMapV1<Key, Value>,
+        map: &mut  SimpleMapV1<Key, Value>,
         i: u64,
     ): (&Key, &mut Value) {
-        let element = vector::borrow_mut(&mut map.data, i);
+        let element = vector::borrow_mut( &mut map.data, i);
         (&element.key, &mut element.value)
     }
 

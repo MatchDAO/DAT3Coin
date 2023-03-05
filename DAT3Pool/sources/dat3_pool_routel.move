@@ -36,9 +36,9 @@ module dat3::dat3_pool_routel {
         data: SimpleMapV1<address, Reward>,
     }
 
-    struct Reward has key, store {
+    struct Reward has drop, key, store {
         reward: u64,
-        claim: u64,
+        claim: u64,//Invalid variable usage. Unbound variable 'pool_info'
     }
 
     //Total daily consumption of users
@@ -73,7 +73,7 @@ module dat3::dat3_pool_routel {
 
 
     //half of the day
-    const SECONDS_OF_12HOUR: u128 = 43200 ;
+    const SECONDS_OF_12HOUR: u64 = 43200 ;
 
     const PERMISSION_DENIED: u64 = 1000;
 
@@ -293,13 +293,13 @@ module dat3::dat3_pool_routel {
         assert!(exists<MsgSender>(sender), error::not_found(NO_TO_USER));
         let m1 = borrow_global<MsgSender>(to);
         let m2 = borrow_global<MsgSender>(sender);
-        if (vector::contains(&m1.serders, *sender)) {
-            1
+        if (vector::contains(&m1.serders,  &sender)) {
+            return  1u64
         };
-        if (vector::contains(&m2.serders, *to)) {
-            2
+        if (vector::contains(&m2.serders, &to)) {
+            return  2u64
         };
-        3
+       return  3u64
     }
 
     public entry fun call_1(
@@ -349,20 +349,20 @@ module dat3::dat3_pool_routel {
             //get msg_hoder of sender
             let msg_hoder = borrow_global_mut<MsgHoder>(user_address);
             let vec = simple_mapv1::borrow_mut(&mut msg_hoder.receiver, &to);
-            let leng = vector::length(**vec);
+            let leng = vector::length(vec);
             if (leng > 0) {
                 let i = 0u64;
                 let re = 0u64;
                 let now = timestamp::now_seconds();
                 while (i < leng) {
                     //Effective time
-                    if ((now - *vector::borrow<u64>(**vec, i)) < SECONDS_OF_12HOUR) {
+                    if ((now - *vector::borrow<u64>(vec, i)) < SECONDS_OF_12HOUR) {
                         re = re + fee_s.chatFee;
                     };
                     i = i + 1;
                 };
                 if (re > 0) {
-                    auser.amount = auser.amount + ((re as u128 * 70 / 100) as u64)
+                    auser.amount = auser.amount + (((re as u128) * 70 / 100) as u64)
                 };
             };
             //reset msg_hoder of sender
@@ -377,7 +377,7 @@ module dat3::dat3_pool_routel {
         let user_r = borrow_global_mut<UsersReward>(@dat3);
         if (simple_mapv1::contains_key(&user_r.data, &user_address)) {
             let your = simple_mapv1::borrow_mut(&mut user_r.data, &user_address);
-            assert!(amount < *your.reward, error::out_of_range(EINSUFFICIENT_BALANCE));
+            assert!(amount < your.reward, error::out_of_range(EINSUFFICIENT_BALANCE));
 
             if (coin::is_account_registered<DAT3>(user_address)) {
                 coin::register<DAT3>(account)
@@ -397,7 +397,7 @@ module dat3::dat3_pool_routel {
         let reward: u64 = 0;
         let claim: u64 = 0;
         if (simple_mapv1::contains_key(&user_r.data, &addr)) {
-            let your_reward = *simple_mapv1::borrow(&user_r.data, &addr);
+            let your_reward = simple_mapv1::borrow(&user_r.data, &addr);
             reward = your_reward.reward;
             claim = your_reward.claim
         };

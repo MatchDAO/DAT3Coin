@@ -21,6 +21,7 @@ module dat3::dat3_stake {
         start_time: u64,
         duration: u64,
         reward: Coin<DAT3>,
+        already_claimed: u64,
         flexible: bool
     }
 
@@ -100,6 +101,7 @@ module dat3::dat3_stake {
                 start_time: 0,
                 duration: 0,
                 reward: coin::zero<DAT3>(),
+                already_claimed: 0u64,
                 flexible: false
             });
 
@@ -183,6 +185,7 @@ module dat3::dat3_stake {
                 amount_staked: amount,
                 start_time: now,
                 duration,
+                already_claimed: 0u64,
                 reward: coin::zero<DAT3>(),
                 flexible,
             })
@@ -209,10 +212,11 @@ module dat3::dat3_stake {
         let addr = signer::address_of(sender);
         assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
         assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
+
+
+        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
         let pool = borrow_global_mut<Pool>(@dat3);
-        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
-
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
         assert!(user.amount_staked > 0, error::aborted(EINSUFFICIENT_BALANCE));
         user.amount_staked = 0;
@@ -229,7 +233,7 @@ module dat3::dat3_stake {
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
-
+        user.already_claimed = user.already_claimed + coin::value(&user.reward);
         coin::deposit<DAT3>(addr, coin::extract_all(&mut user.reward));
     }
 
@@ -291,6 +295,7 @@ module dat3::dat3_stake {
             simple_mapv1::add(&mut s, @dat3_admin, UserPosition {
                 amount_staked: 0,
                 start_time: 0,
+                already_claimed: 0u64,
                 duration: 0,
                 reward: coin::zero<DAT3>(),
                 flexible: false,
@@ -313,10 +318,10 @@ module dat3::dat3_stake {
         //Expected a single non-reference type
         let now = timestamp::now_seconds();
         while (i < leng) {
-            let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
+            let (address, user) = simple_mapv1::find_index(& pool_info.data, i);
             //   this is passed
             let passed = ((((now as u128) - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
-            // check amount_staked,check duration ，check
+            // check amount_staked,check duration,check
             if (user.amount_staked > 0 && (user.duration > passed || user.flexible)) {
                 let temp = 0u128;
                 if (!user.flexible) {
@@ -333,7 +338,7 @@ module dat3::dat3_stake {
             i = 0;
             let reward_val = coin::value<DAT3>(&mut pool.reward)  ;
             while (i < leng) {
-                let user_address = vector::borrow_mut<>(&mut users, i);
+                let user_address = vector::borrow_mut(&mut users, i);
                 let get = simple_mapv1::borrow_mut(&mut pool_info.data, user_address);
                 let passed = ((((now as u128) - (get.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
 
@@ -349,14 +354,13 @@ module dat3::dat3_stake {
 
     #[view]
     public fun apr(
-         staking: u64, duration: u64,flexible:bool
+        staking: u64, duration: u64, flexible: bool
     ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
 
-        let addr=@0x1010;
+        let addr = @0x1010;
 
-        let start = 0u64; //done
         let current_rewards = 0u64;//done
 
 
@@ -365,7 +369,7 @@ module dat3::dat3_stake {
         //all staking
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         let now = timestamp::now_seconds();
-        start = now-1;
+       let  start = now - 1;
         let temp = 0u128;
         let passed = ((((now as u128) - (start as u128)) / SECONDS_OF_WEEK) as u64);
         if (duration > passed) {
@@ -382,7 +386,7 @@ module dat3::dat3_stake {
             duration,
             flexible,
             start,
-            pool_info.data,
+            &pool_info.data,
             now,
             genesis.genesis_time,
             pool.rate_of,
@@ -390,6 +394,7 @@ module dat3::dat3_stake {
         );
         (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), apr, (all_simulate_reward as u64), remaining_time_roi, (remaining_time_vedat3 as u64), apr)
     }
+
     #[view]
     public fun your_staking(
         addr: address,
@@ -414,11 +419,11 @@ module dat3::dat3_stake {
         //all staking
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
 
-        let your_s = simple_mapv1::borrow(&pool_info.data, *addr);
+        let your_s = simple_mapv1::borrow(&pool_info.data, &addr);
         duration = your_s.duration  ;
         staking = your_s.amount_staked  ;
         flexible = your_s.flexible;
-        current_rewards = coin::value<DAT3>(&mut your_s.reward);
+        current_rewards = coin::value<DAT3>(&your_s.reward);
         start = your_s.start_time;
 
         let now = timestamp::now_seconds();
@@ -438,7 +443,7 @@ module dat3::dat3_stake {
             duration,
             flexible,
             start,
-            pool_info.data,
+            &pool_info.data,
             now,
             genesis.genesis_time,
             pool.rate_of,
@@ -474,11 +479,11 @@ module dat3::dat3_stake {
         //all staking
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
 
-        let your_s = simple_mapv1::borrow(&pool_info.data, *addr);
+        let your_s = simple_mapv1::borrow(&pool_info.data, &addr);
         duration = your_s.duration + duration_more;
         staking = your_s.amount_staked + staking_more;
         flexible = your_s.flexible;
-        current_rewards = coin::value<DAT3>(&mut your_s.reward);
+        current_rewards = coin::value<DAT3>(&your_s.reward);
         start = your_s.start_time;
 
         let now = timestamp::now_seconds();
@@ -498,7 +503,7 @@ module dat3::dat3_stake {
             duration,
             flexible,
             start,
-            pool_info.data,
+            &pool_info.data,
             now,
             genesis.genesis_time,
             pool.rate_of,
@@ -512,7 +517,7 @@ module dat3::dat3_stake {
                            duration: u64,
                            flexible: bool,
                            start: u64,
-                           data: SimpleMapV1<address, UserPosition>,
+                           data: &SimpleMapV1<address, UserPosition>,
                            now: u64,
                            genesis_time: u64,
                            rate_of: u128,
@@ -528,12 +533,12 @@ module dat3::dat3_stake {
         let users = vector::empty<address>();
         //index
         let i = 0u64;
-        let leng = simple_mapv1::length(&data);
+        let leng = simple_mapv1::length(data);
         while (i < leng) {
-            let (address, user) = simple_mapv1::find_index_mut(&mut pool_info.data, i);
+            let (address, user) = simple_mapv1::find_index(data, i);
             //   this is passed
             let passed = ((((now as u128) - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64)  ;
-            // check amount_staked,check duration ，check
+            // check amount_staked,check duration ,check
             if (user.amount_staked > 0 && (user.duration > passed || user.flexible) && address != &addr) {
                 //All users who are staking
                 total_staking = total_staking + user.amount_staked;
@@ -574,7 +579,7 @@ module dat3::dat3_stake {
                 if (leng > 0) {
                     while (j < leng) {
                         let add_j = vector::borrow(&users, j);
-                        let temp_user = simple_mapv1::borrow(&data, add_j);
+                        let temp_user = simple_mapv1::borrow(data, add_j);
                         // duration
                         let temp_user_passed = (((time - (temp_user.start_time as u128)) / SECONDS_OF_WEEK) as u64);
                         if (((temp_user.duration > temp_user_passed) || temp_user.flexible) && *add_j != addr) {
