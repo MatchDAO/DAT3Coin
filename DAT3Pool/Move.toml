@@ -12,5 +12,5 @@ veDAT3Coin = { local = "../veDAT3Coin" }
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-dat3 = "0x55be7202d4f411d94be0a09beb7be994504f05cff8c1b26114e6a34f05ebee3d"
-dat3_admin = "0x6122e1b251c4c65ad86d16c6816fbc1cc7ea5f15a9593e5a01b0289bfd4aaa44"
+dat3 = "0x31feb592b32a28328f5c47fbd3962ec77fd24bdf34441b95191d2ef4525c180c"
+dat3_admin = "0xf793644fd85325ddcd908e87decfd0e93c605c64a8098c1aa2e9814f5558b764"

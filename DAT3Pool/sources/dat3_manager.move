@@ -18,11 +18,11 @@ module dat3::dat3_manager {
     #[test_only]
     use aptos_framework::coin::is_account_registered;
     #[test_only]
-    use aptos_framework::timestamp;
-    #[test_only]
     use dat3::dat3_pool;
     use aptos_std::math128;
     use std::error;
+    #[test_only]
+    use dat3::dat3_pool_routel;
 
     struct HodeCap has key {
         burnCap: BurnCapability<DAT3>,
@@ -102,12 +102,15 @@ module dat3::dat3_manager {
             }
         );
 
+        let time = timestamp::now_seconds();
+
         move_to(owner,
             GenesisInfo {
-                genesis_time: now_seconds(),
+                genesis_time: time,
                 withdraw_event: account::new_event_handle<WithdrawBankEvent>(owner)
             }
         );
+        dat3::dat3_stake::init(owner, time);
         mint_to(owner, signer::address_of(owner));
     }
 
@@ -162,7 +165,7 @@ module dat3::dat3_manager {
             owner,
             coin::extract(&mut mint_coins, ((mint_amount * TALK_EMISSION / TOTAL_EMISSION) as u64))
         );
-        dat3::dat3_pool::deposit_reward_coin(
+        dat3::dat3_pool::deposit_active_coin(
             owner,
             coin::extract(&mut mint_coins, ((mint_amount * ACTIVE_EMISSION / TOTAL_EMISSION) as u64))
         );
@@ -181,6 +184,7 @@ module dat3::dat3_manager {
         dat3: &signer, to: &signer, fw: &signer
     ) acquires HodeCap, MintTime, GenesisInfo {
         timestamp::set_time_has_started_for_testing(fw);
+      //  timestamp::update_global_time_for_test(1651255555255555);
         let a = 61u128;
         let temp = ((a / 60u128) as u64);
         let temp1 = ((a % 60u128) as u64);
@@ -197,11 +201,19 @@ module dat3::dat3_manager {
         dat3_pool::init_pool(dat3);
         coin::register<DAT3>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
-        coin::register<DAT3>(to);
-        debug::print(&coin::balance<DAT3>(addr));
-        coin::transfer<DAT3>(dat3, to_addr, 11);
+        // coin::register<DAT3>(to);
+        // debug::print(&coin::balance<DAT3>(addr));
+        // coin::transfer<DAT3>(dat3, to_addr, 11);
 
-        debug::print(&coin::balance<DAT3>(addr));
-        debug::print(&coin::balance<DAT3>(to_addr));
+        // debug::print(&coin::balance<DAT3>(addr));
+        // debug::print(&coin::balance<DAT3>(to_addr));
+
+        dat3_pool_routel::init(dat3);
+        dat3_pool_routel::change_sys_fid(dat3, 123, false);
+        dat3_pool_routel::user_init(dat3, 123, 12);
+        let time =borrow_global<GenesisInfo>(addr).genesis_time;
+        let sss=dat3::dat3_stake::ggg();
+        debug::print(&time);
+        debug::print(&sss);
     }
 }

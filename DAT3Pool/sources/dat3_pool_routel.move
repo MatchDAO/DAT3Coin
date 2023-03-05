@@ -92,7 +92,6 @@ module dat3::dat3_pool_routel {
     const INVALID_RECEIVER: u64 = 303;
     const INVALID_REQUESTER: u64 = 304;
     const INVALID_ROOM_STATE: u64 = 305;
-
     const INVALID_ID: u64 = 400;
 
     struct CapHode has key {
@@ -106,18 +105,19 @@ module dat3::dat3_pool_routel {
         assert!(!exists<UsersReward>(user_address), error::already_exists(ALREADY_EXISTS));
         assert!(!exists<UsersTotalConsumption>(user_address), error::already_exists(ALREADY_EXISTS));
         assert!(!exists<FidStore>(user_address), error::already_exists(ALREADY_EXISTS));
-        move_to(account, UsersReward { data: simple_mapv1::create() });
-        move_to(account, UsersTotalConsumption { data: simple_mapv1::create() });
-        move_to(account, FidStore { data: simple_mapv1::create() });
-        let mFee = simple_mapv1::create();
+        move_to(account, UsersReward { data: simple_mapv1::create<address,Reward>() });
+        move_to(account, UsersTotalConsumption { data: simple_mapv1::create<address,u64>() });
+        move_to(account, FidStore { data: simple_mapv1::create<u64,u64>() });
+        let mFee = simple_mapv1::create<u64,u64>();
         simple_mapv1::add(&mut mFee, 1, 2000000);
         simple_mapv1::add(&mut mFee, 2, 4000000);
         simple_mapv1::add(&mut mFee, 3, 10000000);
         simple_mapv1::add(&mut mFee, 4, 50000000);
         simple_mapv1::add(&mut mFee, 5, 100000000);
         move_to(account, FeeStore { chatFee: 1000000, mFee });
-        move_to(account, RoomState { data: simple_mapv1::create() });
-        move_to(account, MsgSender { serders: vector::empty() });
+
+        move_to(account, RoomState { data: simple_mapv1::create<address,u8>() });
+        move_to(account, MsgSender { serders: vector::empty<address>() });
 
         //
         // let module_authority = dat3_coin_boot::retrieveResourceSignerCap(account);
@@ -136,8 +136,8 @@ module dat3::dat3_pool_routel {
         account::create_signer_with_capability(&borrow_global<CapHode>(@dat3).sigCap)
     }
 
-    public entry fun user_init(account: &signer, fid: u64, uid: u64)
-    acquires UsersReward, UsersTotalConsumption, FidStore
+    public entry fun user_init(account: &signer, fid: u64,uid:u64)
+    acquires FidStore, UsersReward, UsersTotalConsumption
     {
         let user_address = signer::address_of(account);
         // todo check fid
@@ -157,8 +157,14 @@ module dat3::dat3_pool_routel {
         if (!simple_mapv1::contains_key(&user_t.data, &user_address)) {
             simple_mapv1::add(&mut user_t.data, user_address, 0);
         };
-        if (coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
+        if (!coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
             coin::register<0x1::aptos_coin::AptosCoin>(account);
+        };
+        if(!exists<MsgSender>(user_address)){
+            move_to(account, MsgSender { serders: vector::empty<address>() });
+        };
+        if(!exists<MsgHoder>(user_address)){
+            move_to(account, MsgHoder { receiver: simple_mapv1::create<address, vector<u64>>() });
         };
         move_to(account, Member {
             uid,
@@ -167,8 +173,6 @@ module dat3::dat3_pool_routel {
             amount: 0u64,
             mFee: 1,
         });
-        move_to(account, MsgSender { serders: vector::empty() });
-        move_to(account, MsgHoder { receiver: simple_mapv1::create() });
     }
 
     #[view]
@@ -293,13 +297,13 @@ module dat3::dat3_pool_routel {
         assert!(exists<MsgSender>(sender), error::not_found(NO_TO_USER));
         let m1 = borrow_global<MsgSender>(to);
         let m2 = borrow_global<MsgSender>(sender);
-        if (vector::contains(&m1.serders,  &sender)) {
-            return  1u64
+        if (vector::contains(&m1.serders, &sender)) {
+            return 1u64
         };
         if (vector::contains(&m2.serders, &to)) {
-            return  2u64
+            return 2u64
         };
-       return  3u64
+        return 3u64
     }
 
     public entry fun call_1(
@@ -366,7 +370,7 @@ module dat3::dat3_pool_routel {
                 };
             };
             //reset msg_hoder of sender
-            *vec=vector::empty<u64>();
+            *vec = vector::empty<u64>();
         };
     }
 
@@ -579,4 +583,9 @@ module dat3::dat3_pool_routel {
         let room = borrow_global<Room>(requester);
         (room.addr, room.receiver, room.started_at, room.finished_at, room.minute_rate, room.minute, room.deposit, room.done)
     }
+
+
+
+
+
 }

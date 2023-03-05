@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x55be7202d4f411d94be0a09beb7be994504f05cff8c1b26114e6a34f05ebee3d'
+DAT3='0x31feb592b32a28328f5c47fbd3962ec77fd24bdf34441b95191d2ef4525c180c'
 PROFILE="devnet"
 echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd `
@@ -61,8 +61,8 @@ sleep 5
 echo "dat3_manager::init_dat3_coin"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_manager::init_dat3_coin`
 echo""
-echo "dat3_stake::init"
-echo `aptos move run   --assume-yes --function-id $DAT3::dat3_stake::init`
+#echo "dat3_stake::init"
+#echo `aptos move run   --assume-yes --function-id $DAT3::dat3_stake::init`
 echo""
 sleep 3
 echo " dat3_pool::init_pool "
@@ -71,10 +71,12 @@ echo""
 sleep 2
 echo " dat3_pool_routel::init"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::init`
+echo""
 sleep 2
 echo " dat3_pool_routel::change_sys_fid --args u64:999999999999999  bool:false"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::change_sys_fid --args u64:999999999999999  bool:false`
 sleep 2
+echo""
 echo "dat3_pool_routel::user_init"
 echo `aptos move run   --assume-yes --function-id $DAT3::dat3_pool_routel::user_init   --args u64:999999999999999  u64:13 `
 sleep 2

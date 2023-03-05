@@ -50,7 +50,7 @@ module dat3::dat3_pool {
         let addr = signer::address_of(account);
         assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
-        if (coin::is_account_registered<DAT3>(addr)) {
+        if (!coin::is_account_registered<DAT3>(addr)) {
             coin::register<DAT3>(account)
         };
         move_to(account, Pool {
