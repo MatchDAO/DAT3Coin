@@ -30,7 +30,7 @@ module dat3::dat3_manager {
     use std::vector;
     use aptos_token::token;
     #[test_only]
-    use aptos_token::token::check_collection_exists;
+    use aptos_token::token::{check_collection_exists};
 
     struct HodeCap has key {
         burnCap: BurnCapability<DAT3>,
@@ -272,7 +272,8 @@ module dat3::dat3_manager {
     init_dat3_coin(owner: &signer) acquires
     HodeCap,
     MintTime,
-    GenesisInfo {
+    GenesisInfo
+    {
         assert!(signer::address_of(owner) == @dat3, error::permission_denied(PERMISSION_DENIED));
         //only once
         assert!(!exists<GenesisInfo>(@dat3), error::already_exists(ALREADY_EXISTS));
@@ -372,7 +373,8 @@ module dat3::dat3_manager {
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
     fun dat3_coin_init(
         dat3: &signer, to: &signer, fw: &signer
-    ) acquires HodeCap, MintTime, GenesisInfo {
+    ) acquires HodeCap, MintTime, GenesisInfo
+    {
         timestamp::set_time_has_started_for_testing(fw);
         //  timestamp::update_global_time_for_test(1651255555255555);
         let a = 61u128;
@@ -463,14 +465,14 @@ module dat3::dat3_manager {
         let token_uris = vector::empty<String>();
         vector::push_back(&mut token_uris, string::utf8(b"1u"));
         vector::push_back(&mut token_uris, string::utf8(b"2u"));
-        vector::push_back(&mut token_uris, string::utf8(b"2u"));
+       // vector::push_back(&mut token_uris, string::utf8(b"2u"));
 
         let property_keys = vector::empty<vector<String>>();
         let keys = vector::empty<String>();
         vector::push_back(&mut keys, string::utf8(b"key"));
         vector::push_back(&mut property_keys, keys);
         vector::push_back(&mut property_keys, keys);
-        vector::push_back(&mut property_keys, keys);
+       // vector::push_back(&mut property_keys, keys);
 
         let property_values = vector::empty<vector<vector<u8>>>();
         let v1 = vector::empty<vector<u8>>();
@@ -478,7 +480,7 @@ module dat3::dat3_manager {
         vector::push_back(&mut v1, *b1);
         vector::push_back(&mut property_values, v1);
         vector::push_back(&mut property_values, v1);
-        vector::push_back(&mut property_values, v1);
+        //vector::push_back(&mut property_values, v1);
 
         let property_types = vector::empty<vector<String>>();
         let st = vector::empty<String>();
@@ -487,11 +489,18 @@ module dat3::dat3_manager {
 
         vector::push_back(&mut property_types, st);
         vector::push_back(&mut property_types, st);
-        vector::push_back(&mut property_types, st);
+       // vector::push_back(&mut property_types, st);
         add_tokens(dat3, string::utf8(b"name1"), names, token_uris, property_keys, property_values, property_keys);
 
+        let token_id = token::create_token_id_raw(
+             @dat3_nft,
+            string::utf8(b"name1"),
+            string::utf8(b"name -->#1"),
+            0
+        );
 
-        debug::print(&check_coll);
+        debug::print( &token::balance_of(@dat3, token_id)   );
+        debug::print( &token::balance_of(@dat3, token_id)   );
     }
     //move test --filter dat3_manager::dat3_nft_init
     // admin: &signer,

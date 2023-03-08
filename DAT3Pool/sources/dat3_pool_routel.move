@@ -10,6 +10,8 @@ module dat3::dat3_pool_routel {
     use dat3::dat3_coin::DAT3;
     use dat3::dat3_pool;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
+    use aptos_token::token;
+    use std::string::String;
 
     struct Member has key, store {
         uid: u64,
@@ -54,6 +56,8 @@ module dat3::dat3_pool_routel {
     }
 
     struct FidReward has key, store, drop {
+        token: String,
+        collection: String,
         fid: u64,
         spend: u64,
         earn: u64,
@@ -231,7 +235,13 @@ module dat3::dat3_pool_routel {
         };
     }
 
-    public entry fun change_sys_fid(user: &signer, fid: u64, del: bool) acquires FidStore {
+    public entry fun change_sys_fid(
+        user: &signer,
+        fid: u64,
+        del: bool,
+        token: String,
+        collection: String
+    ) acquires FidStore {
         let user_address = signer::address_of(user);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
         assert!(exists<FidStore>(@dat3), error::permission_denied(PERMISSION_DENIED));
@@ -251,6 +261,8 @@ module dat3::dat3_pool_routel {
         }else {
             if (!del) {
                 simple_mapv1::add(&mut f.data, fid, FidReward {
+                    token,
+                    collection,
                     fid: fid,
                     spend: 0,
                     earn: 0,
@@ -362,7 +374,7 @@ module dat3::dat3_pool_routel {
             let your = simple_mapv1::borrow_mut(&mut total.data, &user_address);
             *your = *your + fee_s.chatFee;
             //fid_re(fid: u64, den: u128, num: u128, amount: u64, s: bool)
-            fid_re(auser.fid,fee_s.invite_reward_fee_den,fee_s.invite_reward_fee_num,fee_s.chatFee,true);
+            fid_re(auser.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, fee_s.chatFee, true);
         }else {
             //is receiver
             //get msg_hoder of sender
@@ -381,16 +393,14 @@ module dat3::dat3_pool_routel {
                     i = i + 1;
                 };
                 if (re > 0) {
-                    let earn=(((re as u128) * 70 / 100) as u64);
+                    let earn = (((re as u128) * 70 / 100) as u64);
                     auser.amount = auser.amount + earn;
                     //earn
-                    fid_re(auser.fid,fee_s.invite_reward_fee_den,fee_s.invite_reward_fee_num,earn,false);
+                    fid_re(auser.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, earn, false);
                 };
-
             };
             //reset msg_hoder of sender
             *vec = vector::empty<u64>();
-
         };
     }
 
@@ -431,9 +441,34 @@ module dat3::dat3_pool_routel {
             your.claim = your.claim + amount
         };
     }
-    // public entry fun claim_invite_reward(account: &signer, amount: u64) acquires UsersReward {
-    //     token::
-    // }
+
+    public entry fun claim_invite_reward(
+        account: &signer,
+        fid: u64
+    ) acquires FidStore
+    {
+        let addr = signer::address_of(account);
+        assert!(exists<Member>(addr), error::not_found(NO_USER));
+        let f_s = borrow_global_mut<FidStore>(@dat3);
+        assert!(simple_mapv1::contains_key(&f_s.data, &fid), error::not_found(NOT_FOUND));
+        let fid_r = simple_mapv1::borrow_mut(&mut f_s.data, &fid);
+
+        if (addr == @dat3 && fid_r.fid == 999999999999999u64) {
+            dat3_pool::withdraw(addr, fid_r.amount);
+            fid_r.amount = 0;
+        }else {
+            let token_id = token::create_token_id_raw(
+                @dat3_nft,
+                fid_r.collection,
+                fid_r.token,
+                0
+            );
+            if (token::balance_of(addr, token_id) > 0) {
+                dat3_pool::withdraw(addr, fid_r.amount);
+                fid_r.amount = 0;
+            };
+        };
+    }
 
 
     #[view]
@@ -582,7 +617,7 @@ module dat3::dat3_pool_routel {
         req_session.deposit = req_session.deposit + req_session.minute_rate;
 
         let fee_s = borrow_global<FeeStore>(@dat3);
-        fid_re(req_user.fid,fee_s.invite_reward_fee_den,fee_s.invite_reward_fee_num, req_session.minute_rate,true);
+        fid_re(req_user.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, req_session.minute_rate, true);
     }
 
     //3. Upon closing of the session, send payment to the receiver, and refund any remaining funds to the requester
@@ -619,10 +654,16 @@ module dat3::dat3_pool_routel {
         *your = *your + to_rec;
         //to rec
         let rec_user = borrow_global_mut<Member>(receiver);
-        rec_user.amount = rec_user.amount + (((to_rec * 70 as u128) / (100u128) )as u64);
+        rec_user.amount = rec_user.amount + (((to_rec * 70 as u128) / (100u128)) as u64);
         let fee_s = borrow_global<FeeStore>(@dat3);
         //earn
-        fid_re(rec_user.fid,fee_s.invite_reward_fee_den,fee_s.invite_reward_fee_num, (((to_rec * 70 as u128) / (100u128) )as u64),false);
+        fid_re(
+            rec_user.fid,
+            fee_s.invite_reward_fee_den,
+            fee_s.invite_reward_fee_num,
+            (((to_rec * 70 as u128) / (100u128)) as u64),
+            false
+        );
         //change state
         room_state_change(requester, 0);
         room_state_change(receiver, 0);
