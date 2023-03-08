@@ -8,9 +8,11 @@ AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-fr
 AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token" }
 DAT3CoinBoot = { local = "../dat3coinboot" }
 veDAT3Coin = { local = "../veDAT3Coin" }
+
 [addresses]
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-dat3 = "0x31feb592b32a28328f5c47fbd3962ec77fd24bdf34441b95191d2ef4525c180c"
-dat3_admin = "0xf793644fd85325ddcd908e87decfd0e93c605c64a8098c1aa2e9814f5558b764"
+dat3 = "0x105a15bc136800e54a8eb581be98d8f812e81468031f2860466c4fe29974ae98"
+dat3_admin = "0x17b23fd4e3dfcdf5ba6f802c0a278f3e0c97088d3e1840ebc9cf24a1409ef3c9"
+dat3_nft = "0x34aac8899c4ad58c440442683fb1d87ce368f84d0015cfb748641dba1ca95eb9"

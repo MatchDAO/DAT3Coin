@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x31feb592b32a28328f5c47fbd3962ec77fd24bdf34441b95191d2ef4525c180c'
+DAT3='0x105a15bc136800e54a8eb581be98d8f812e81468031f2860466c4fe29974ae98'
 PROFILE="devnet"
 echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd `
@@ -17,7 +17,7 @@ DAT3Pool="$DAT3_PATH/DAT3Pool"
 
 cd $BOOT_PATH
 echo " step 1 :bigin compile&publish boot :  -->`pwd`"
-echo "`ls`"
+
 echo `aptos move compile --package-dir "$BOOT_PATH" `
 
 echo "aptos move publish -->  $BOOT_PATH  "

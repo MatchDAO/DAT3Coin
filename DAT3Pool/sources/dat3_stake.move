@@ -13,7 +13,7 @@ module dat3::dat3_stake {
     use std::vector;
     use aptos_std::math128;
     use std::error;
-    use dat3::dat3_coin_boot;
+    // use dat3::dat3_coin_boot;
 
     friend dat3::dat3_manager;
     struct UserPosition has key, store {
@@ -72,7 +72,7 @@ module dat3::dat3_stake {
 
 
     public entry fun init(
-        sender: &signer, time: u64  )
+        sender: &signer, time: u64)
     {
         let addr = signer::address_of(sender);
         assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
@@ -81,8 +81,8 @@ module dat3::dat3_stake {
         };
         if (!exists<Pool>(addr)) {
             //test
-            // let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
-             let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
+             let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
+           // let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
             let auth_signer = account::create_signer_with_capability(&module_authority);
             let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
                 string::utf8(b"veDAT3 Coin"),
@@ -177,7 +177,7 @@ module dat3::dat3_stake {
         // Deposit staked coin
         coin::merge(&mut pool.stake, stake);
         let flexible = false;
-        if (duration > 0) {
+        if (duration == 0) {
             flexible = true;
         };
         // Update UserPosition
@@ -273,8 +273,6 @@ module dat3::dat3_stake {
     public(friend) fun mint_pool(
         _sender: &signer, coins: Coin<DAT3>) acquires Pool, PoolInfo
     {
-
-
         let pool = borrow_global_mut<Pool>(@dat3);
         coin::merge(&mut pool.reward, coins);
 
@@ -332,7 +330,7 @@ module dat3::dat3_stake {
     #[view]
     public fun apr(
         staking: u64, duration: u64, flexible: bool
-    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
+    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
 
@@ -369,13 +367,13 @@ module dat3::dat3_stake {
             pool.rate_of,
             pool.rate_of_decimal
         );
-        (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), apr, all_simulate_reward, remaining_time_roi, apr, remaining_time_vedat3)
+        (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64),  all_simulate_reward, remaining_time_roi, apr, remaining_time_vedat3)
     }
 
     #[view]
     public fun your_staking(
         addr: address,
-    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
+    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64 ) acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
         let vedat3 = 0u64;
@@ -418,16 +416,16 @@ module dat3::dat3_stake {
                 pool.rate_of,
                 pool.rate_of_decimal
             );
-            return (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), apr, all_simulate_reward, roi, vedat3, apr)
+            return (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64),  all_simulate_reward, roi,apr, vedat3)
         };
 
-        return (0, staking, duration, flexible, current_rewards, start, (boost as u64), 0, 0u64, 0, vedat3, 0)
+        return (0, staking, duration, flexible, current_rewards, start, (boost as u64), 0, 0u64, 0, vedat3 )
     }
 
     #[view]
     public fun your_staking_more(
         addr: address, staking_more: u64, duration_more: u64
-    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
+    ): (u64, u64, u64, bool, u64, u64,  u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
 
@@ -470,7 +468,7 @@ module dat3::dat3_stake {
             pool.rate_of,
             pool.rate_of_decimal
         );
-        (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), apr, all_simulate_reward, remaining_time_roi, apr, (remaining_time_vedat3 + vedat3))
+        (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64),  all_simulate_reward, remaining_time_roi, apr, (remaining_time_vedat3 + vedat3))
     }
 
     fun staking_calculator(addr: address,

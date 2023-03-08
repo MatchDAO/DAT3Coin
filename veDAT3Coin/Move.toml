@@ -3,7 +3,8 @@ name = 'veDAT3Coin'
 version = '0.0.1'
 upgrade_policy = "compatible"
 
-[addresses]
-vedat3 = "0xf793644fd85325ddcd908e87decfd0e93c605c64a8098c1aa2e9814f5558b764"
 [dependencies.AptosFramework]
 local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework"
+
+[addresses]
+vedat3 = "0x17b23fd4e3dfcdf5ba6f802c0a278f3e0c97088d3e1840ebc9cf24a1409ef3c9"

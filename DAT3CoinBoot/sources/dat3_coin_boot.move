@@ -5,12 +5,8 @@ module dat3::dat3_coin_boot {
 
     use aptos_framework::code;
 
-    #[test_only]
-    use aptos_std::debug;
-    use std::error;
-    #[test_only]
-    use std::vector;
 
+    use std::error;
 
     const ERR_PERMISSIONS: u64 = 403;
 
@@ -21,8 +17,7 @@ module dat3::dat3_coin_boot {
 
     const PERMISSION_DENIED: u64 = 1000;
     const INVALID_ARGUMENT: u64 = 105;
-
-    /// Deploy code & store tempo resource signer
+    // Deploy code & store tempo resource signer
     public entry fun initializeWithResourceAccount(
         admin: &signer,
         metadata: vector<u8>,
@@ -48,15 +43,56 @@ module dat3::dat3_coin_boot {
         sinCap
     }
 
+    const NUM_VEC: vector<u8> = b"0123456789";
+
+    // #[test_only]
+    // use std::string;
+    // #[test_only]
+    // use std::string::String;
+    #[test_only]
+    use std::vector;
+    #[test_only]
+    use aptos_std::debug;
+
+    // #[test_only]
+    // fun intToString(_n: u64): String {
+    //     let v = _n;
+    //     let str_b = b"";
+    //     if (v > 0) {
+    //         while (v > 0) {
+    //             let rest = v % 10;
+    //             v = v / 10;
+    //             vector::push_back(&mut str_b, *vector::borrow(&NUM_VEC, rest));
+    //         };
+    //         vector::reverse(&mut str_b);
+    //     } else {
+    //         vector::append(&mut str_b, b"0");
+    //     };
+    //     string::utf8(str_b)
+    // }
     #[test(dat3 = @dat3)]
     fun test_resource_account(
         dat3: &signer
     ) {
+        // let temp_u64 = 8u64;
+        // let str = intToString(temp_u64);
+        // let app = string::utf8(b"ad98 #");
+        // let u = string::internal_check_utf8(string::bytes(&str))  ;
+        //
+        // string::append(&mut app, str);
+        // debug::print(&u);
+        // debug::print(&str);
+        // debug::print(&app);
         let (_, signer_cap) =
             account::create_resource_account(dat3, b"dat3");
+        let (_, signer_cap2) =
+            account::create_resource_account(dat3, b"dat3_nft");
         let sig = account::create_signer_with_capability(&signer_cap);
+        let sig2 = account::create_signer_with_capability(&signer_cap2);
         debug::print(&signer::address_of(dat3));
         debug::print(&signer::address_of(&sig));
+        debug::print(&signer::address_of(&sig2));
+
         //mint
         let year = 50u128 / 50;
         let m = 1u128;
@@ -79,8 +115,8 @@ module dat3::dat3_coin_boot {
         let j = 0u64;
         while (j < leng) {
             let temp = vector::borrow(&uuuu, j);
-            let os=*temp;
-            if ((*temp as u128) % 2== 0) {
+            let os = *temp;
+            if ((*temp as u128) % 2 == 0) {
                 vector::swap_remove(&mut uuuu, j);
                 j = j - 1;
                 if ((leng - j) > 1) {
@@ -91,6 +127,5 @@ module dat3::dat3_coin_boot {
             debug::print(&uuuu);
             j = j + 1;
         };
-
     }
 }
