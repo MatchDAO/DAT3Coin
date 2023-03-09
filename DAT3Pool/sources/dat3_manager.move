@@ -363,7 +363,7 @@ module dat3::dat3_manager {
         coin::register<DAT3>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
         dat3_pool_routel::init(dat3);
-        let ssssss=  dat3_pool_routel::change_sys_fid(dat3,999u64,
+           dat3_pool_routel::change_sys_fid(dat3,999u64,
             false,string::utf8(b"t1"),string::utf8(b"c1"));
 
         dat3_pool_routel::user_init(dat3, 999,
@@ -500,19 +500,33 @@ module dat3::dat3_manager {
         dat3_stake::withdraw(dat3);
         debug::print(&coin::balance<DAT3>(addr));
         debug::print(&coin::balance<DAT3>(addr));
-        // let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11) = dat3_stake::your_staking(to_addr);
-        // debug::print(&string::utf8(b"begin"));
-        // debug::print(&v1);
-        // debug::print(&v2);
-        // debug::print(&v3);
-        // debug::print(&v4);
-        // debug::print(&v5);
-        // debug::print(&v6);
-        // debug::print(&v7);
-        // debug::print(&v8);
-        // debug::print(&v9);
-        // debug::print(&v10);
-        // debug::print(&v11);
+          let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11) = dat3_stake::your_staking(addr);
+         debug::print(&string::utf8(b"begin"));
+         debug::print(&v1);
+         debug::print(&v2);
+         debug::print(&v3);
+         debug::print(&v4);
+         debug::print(&v5);
+         debug::print(&v6);
+         debug::print(&v7);
+         debug::print(&v8);
+         debug::print(&v9);
+         debug::print(&v10);
+         debug::print(&v11);
+
+         (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11) = dat3_stake::your_staking_more(addr,100,10);
+        debug::print(&string::utf8(b"begin"));
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        debug::print(&v7);
+        debug::print(&v8);
+        debug::print(&v9);
+        debug::print(&v10);
+        debug::print(&v11);
     }
 
     fun u64_to_string(value: u64): String

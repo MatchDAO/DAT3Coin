@@ -12,7 +12,7 @@ module dat3::dat3_stake {
     use vedat3::vedat3_coin::VEDAT3;
 
     use dat3::dat3_coin::DAT3;
-     use dat3::dat3_coin_boot;
+    use dat3::dat3_coin_boot;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
     friend dat3::dat3_manager;
 
@@ -81,8 +81,8 @@ module dat3::dat3_stake {
         };
         if (!exists<Pool>(addr)) {
             //test
-              // let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
-             let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
+            // let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
+            let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
             let auth_signer = account::create_signer_with_capability(&module_authority);
             let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
                 string::utf8(b"veDAT3 Coin"),
@@ -334,7 +334,7 @@ module dat3::dat3_stake {
     : (u64, u64, bool, u64, u64, u64, u128, u128, u128, u128, u128, )
     acquires Pool, PoolInfo, GenesisInfo
     {
-        assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
+        assert!(exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
 
         let addr = @0x1010;
 
@@ -432,7 +432,7 @@ module dat3::dat3_stake {
     ): (u64, u64, bool, u64, u64, u64, u128, u128, u128, u128, u128)
     acquires Pool, PoolInfo, GenesisInfo
     {
-        assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
+        assert!(exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
         let pool = borrow_global<Pool>(@dat3);
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
         if (!simple_mapv1::contains_key(&pool_info.data, &addr)) {
@@ -498,7 +498,7 @@ module dat3::dat3_stake {
         let _vedat3 = 0u128;
         let time = (now as u128) + 1;
         let all_simulate_reward = 0u128;
-        let you_user = simple_mapv1::borrow(data, &addr);
+
         let users = vector::empty<address>();
         //index
         let i = 0u64;
@@ -539,32 +539,34 @@ module dat3::dat3_stake {
 
 
         if (flexible) {
-            //Represents that there are currently staking
-            if (you_user.already_reward > 0 && you_user.start_time > 0 && (((now - you_user.start_time) as u128) / SECONDS_OF_DAY) > 0) {
-                let actually_day = ((now - you_user.start_time) as u128) / SECONDS_OF_DAY   ;
-                let apr = (you_user.already_reward as u128) * 365 * 100000000 / (staking as u128) / actually_day   ;
-                // let
-                let roi = (you_user.already_reward as u128) * 100000000 / (staking as u128)  ;
-                if (coin::is_account_registered<VEDAT3>(addr)) {
-                    _vedat3 = (coin::balance<VEDAT3>(addr) as u128) ;
-                };
-                _vedat3 = my_today  ;
-                let taday_r = today_mint * my_today / (today_volume + my_today);
-                return (total_staking, taday_r, roi, apr, _vedat3)
+            if (simple_mapv1::contains_key(data, &addr)) {
+                let you_user = simple_mapv1::borrow(data, &addr);
+                //Represents that there are currently staking
+                if (you_user.already_reward > 0 && you_user.start_time > 0 && (((now - you_user.start_time) as u128) / SECONDS_OF_DAY) > 0) {
+                    let actually_day = ((now - you_user.start_time) as u128) / SECONDS_OF_DAY   ;
+                    let apr = (you_user.already_reward as u128) * 365 * 100000000 / (staking as u128) / actually_day   ;
+                    // let
+                    let roi = (you_user.already_reward as u128) * 100000000 / (staking as u128)  ;
+                    if (coin::is_account_registered<VEDAT3>(addr)) {
+                        _vedat3 = (coin::balance<VEDAT3>(addr) as u128) ;
+                    };
+                    _vedat3 = my_today  ;
+                    let taday_r = today_mint * my_today / (today_volume + my_today);
+                    return (total_staking, taday_r, roi, apr, _vedat3)
 
-                //A trailing ';' in an expression block implicitly adds a '()' value after the semicolon. That '()' value will not be reachable
-                //     Any code after this expression will not be reached
-            }else {
-                //   staking * y''      y''= (week*0.3836)+1
-                let taday_r = today_mint * my_today / (today_volume + my_today);
-                let apr = taday_r * 365 * 100000000 / (staking as u128) ;
-                let roi = (taday_r) * 100000000 / (staking as u128) ;
-                if (coin::is_account_registered<VEDAT3>(addr)) {
-                    _vedat3 = ((coin::balance<VEDAT3>(addr)) as u128);
+                    //A trailing ';' in an expression block implicitly adds a '()' value after the semicolon. That '()' value will not be reachable
+                    //     Any code after this expression will not be reached
                 };
-                _vedat3 = _vedat3 + my_today  ;
-                return (total_staking, taday_r, roi, apr, _vedat3)
-            }
+            };
+            //   staking * y''      y''= (week*0.3836)+1
+            let taday_r = today_mint * my_today / (today_volume + my_today);
+            let apr = taday_r * 365 * 100000000 / (staking as u128) ;
+            let roi = (taday_r) * 100000000 / (staking as u128) ;
+            if (coin::is_account_registered<VEDAT3>(addr)) {
+                _vedat3 = ((coin::balance<VEDAT3>(addr)) as u128);
+            };
+            _vedat3 = _vedat3 + my_today  ;
+            return (total_staking, taday_r, roi, apr, _vedat3)
         };
 
         //A trailing ';' in an expression block implicitly adds a '()' value after the semicolon. That '()' value will not be reachable
