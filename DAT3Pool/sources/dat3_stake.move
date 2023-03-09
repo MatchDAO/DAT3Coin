@@ -14,8 +14,9 @@ module dat3::dat3_stake {
     use dat3::dat3_coin::DAT3;
     use dat3::dat3_coin_boot;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
-
     friend dat3::dat3_manager;
+
+
     struct UserPosition has key, store {
         amount_staked: u64,
         start_time: u64,
@@ -71,8 +72,7 @@ module dat3::dat3_stake {
     const ONE_W: u64 = 604800;
 
 
-    public entry fun init(
-        sender: &signer, time: u64)
+    public entry fun init(sender: &signer, time: u64)
     {
         let addr = signer::address_of(sender);
         assert!(addr == @dat3, error::permission_denied(PERMISSION_DENIED));
@@ -81,8 +81,8 @@ module dat3::dat3_stake {
         };
         if (!exists<Pool>(addr)) {
             //test
-            // let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
-            let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
+             // let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
+             let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
             let auth_signer = account::create_signer_with_capability(&module_authority);
             let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
                 string::utf8(b"veDAT3 Coin"),
@@ -158,9 +158,10 @@ module dat3::dat3_stake {
         }
     }
 
-    /// Deposit stake coin to the incentive pool to start earning rewards.
-    /// All pending rewards will be transferred to `sender`.
-    public entry fun deposit(sender: &signer, amount: u64, duration: u64) acquires Pool, PoolInfo
+    // Deposit stake coin to the incentive pool to start earning rewards.
+    // All pending rewards will be transferred to `sender`.
+    public entry fun deposit(sender: &signer, amount: u64, duration: u64)
+    acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
 
@@ -206,8 +207,8 @@ module dat3::dat3_stake {
         };
     }
 
-    /// Withdraw stake coin from the incentive pool.
-    /// All pending rewards will be transferred to `sender`.
+    // Withdraw stake coin from the incentive pool.
+    // All pending rewards will be transferred to `sender`.
     public entry fun withdraw(sender: &signer) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
@@ -216,7 +217,7 @@ module dat3::dat3_stake {
 
 
         let pool_info = borrow_global_mut<PoolInfo>(@dat3);
-        assert!(!simple_mapv1::contains_key(&pool_info.data, &addr), NO_USER);
+        assert!(simple_mapv1::contains_key(&pool_info.data, &addr), error::not_found(NO_USER));
         let pool = borrow_global_mut<Pool>(@dat3);
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
         assert!(user.amount_staked > 0, error::aborted(EINSUFFICIENT_BALANCE));
@@ -226,8 +227,9 @@ module dat3::dat3_stake {
         coin::deposit(addr, coin::extract(&mut pool.stake, user.amount_staked));
     }
 
-    /// Claim staking rewards without modifying staking position
-    public entry fun claim(sender: &signer) acquires PoolInfo {
+    // Claim staking rewards without modifying staking position
+    public entry fun claim(sender: &signer) acquires PoolInfo
+    {
         let addr = signer::address_of(sender);
         assert!(coin::is_account_registered<DAT3>(addr), error::aborted(INVALID_ARGUMENT));
         assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
@@ -239,7 +241,8 @@ module dat3::dat3_stake {
 
 
     #[view]
-    public fun pool_info(): (u64, u64, u128, u128, u64) acquires Pool {
+    public fun pool_info(): (u64, u64, u128, u128, u64) acquires Pool
+    {
         assert!(exists<Pool>(@dat3), error::aborted(INCENTIVE_POOL_NOT_FOUND));
         let pool = borrow_global<Pool>(@dat3);
 
@@ -250,9 +253,8 @@ module dat3::dat3_stake {
             pool.max_lock_time)
     }
 
-    public entry fun set_pool(
-        sender: &signer, rate_of: u128, rate_of_decimal: u128, max_lock_time: u64
-    ) acquires Pool
+    public entry fun set_pool(sender: &signer, rate_of: u128, rate_of_decimal: u128, max_lock_time: u64)
+    acquires Pool
     {
         let addr = signer::address_of(sender);
         assert!(addr == @dat3, error::aborted(PERMISSION_DENIED));
@@ -270,8 +272,8 @@ module dat3::dat3_stake {
     }
 
 
-    public(friend) fun mint_pool(
-        _sender: &signer, coins: Coin<DAT3>) acquires Pool, PoolInfo
+    public(friend) fun mint_pool(_sender: &signer, coins: Coin<DAT3>)
+    acquires Pool, PoolInfo
     {
         let pool = borrow_global_mut<Pool>(@dat3);
         coin::merge(&mut pool.reward, coins);
@@ -328,9 +330,9 @@ module dat3::dat3_stake {
     }
 
     #[view]
-    public fun apr(
-        staking: u64, duration: u64, flexible: bool
-    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
+    public fun apr(staking: u64, duration: u64, flexible: bool)
+    : (u64, u64, bool, u64, u64, u64, u128, u128, u128, u128, u128, )
+    acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
 
@@ -354,7 +356,7 @@ module dat3::dat3_stake {
         let boost = ((temp * pool.rate_of) + pool.rate_of_decimal) ;
 
 
-        let (total_staking, _staking, _duration, _flexible, all_simulate_reward, remaining_time_roi, apr, remaining_time_vedat3)
+        let (total_staking, all_simulate_reward, roi, apr, vedat3)
             = staking_calculator(
             addr,
             staking,
@@ -367,25 +369,28 @@ module dat3::dat3_stake {
             pool.rate_of,
             pool.rate_of_decimal
         );
-        (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), all_simulate_reward, remaining_time_roi, apr, remaining_time_vedat3)
+        (staking, duration, flexible, current_rewards, start, (boost as u64), total_staking, all_simulate_reward, roi, apr, vedat3)
     }
 
     #[view]
-    public fun your_staking(
-        addr: address,
-    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
+    public fun your_staking(addr: address, )
+    : (u64, u64, bool, u64, u64, u64, u128, u128, u128, u128, u128) acquires Pool, PoolInfo, GenesisInfo
     {
-        assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
-        let vedat3 = 0u64;
+        assert!(exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
+        let pool = borrow_global<Pool>(@dat3);
+        //all staking
+        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
+        if (!simple_mapv1::contains_key(&pool_info.data, &addr)) {
+            return (0u64, 0u64, true, 0u64, 0u64, 0u64, (coin::value(&pool.stake) as u128), 0u128, 0u128, 0u128, 0u128)
+        };
+        let your_s = simple_mapv1::borrow(&pool_info.data, &addr);
+        let vedat3 = 0u128;
         if (is_account_registered<VEDAT3>(addr)) {
-            vedat3 = coin::balance<VEDAT3>(addr);
+            vedat3 = ((coin::balance<VEDAT3>(addr) as u128));
         };
         let pool = borrow_global<Pool>(@dat3);
         let genesis = borrow_global<GenesisInfo>(@dat3);
-        //all staking
-        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
 
-        let your_s = simple_mapv1::borrow(&pool_info.data, &addr);
         let duration = your_s.duration  ;
         let staking = your_s.amount_staked  ;
         let flexible = your_s.flexible;
@@ -402,8 +407,8 @@ module dat3::dat3_stake {
 
             //add your stake factor
             let boost = ((temp * pool.rate_of) + pool.rate_of_decimal) ;
-            // return (total_staking, staking, duration, flexible, all_simulate_reward, roi, vedat3,apr(apr as u64))
-            let (total_staking, _staking, _duration, _flexible, all_simulate_reward, roi, vedat3, apr)
+            // return  (total_staking, staking, duration, flexible, (taday_r as u64), roi, apr, _vedat3)
+            let (total_staking, all_simulate_reward, roi, apr, vedat3)
                 = staking_calculator(
                 addr,
                 staking,
@@ -416,27 +421,30 @@ module dat3::dat3_stake {
                 pool.rate_of,
                 pool.rate_of_decimal
             );
-            return (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), all_simulate_reward, roi, apr, vedat3)
+            return (staking, duration, flexible, current_rewards, start, (boost as u64), total_staking, all_simulate_reward, roi, apr, vedat3)
         };
 
-        return (0, staking, duration, flexible, current_rewards, start, (boost as u64), 0, 0u64, 0, vedat3)
+        return (staking, duration, flexible, current_rewards, start, (boost as u64), 0u128, 0u128, 0u128, 0u128, vedat3)
     }
 
     #[view]
-    public fun your_staking_more(
-        addr: address, staking_more: u64, duration_more: u64
-    ): (u64, u64, u64, bool, u64, u64, u64, u64, u64, u64, u64) acquires Pool, PoolInfo, GenesisInfo
+    public fun your_staking_more(addr: address, staking_more: u64, duration_more: u64
+    ): (u64, u64, bool, u64, u64, u64, u128, u128, u128, u128, u128)
+    acquires Pool, PoolInfo, GenesisInfo
     {
         assert!(!exists<Pool>(@dat3), error::already_exists(ALREADY_EXISTS));
-
-        let vedat3 = 0u64;
-        if (is_account_registered<VEDAT3>(addr)) {
-            vedat3 = coin::balance<VEDAT3>(addr);
-        };
         let pool = borrow_global<Pool>(@dat3);
+        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
+        if (!simple_mapv1::contains_key(&pool_info.data, &addr)) {
+            return (0u64, 0u64, true, 0u64, 0u64, 0u64, (coin::value(&pool.stake) as u128), 0u128, 0u128, 0u128, 0u128)
+        };
+        let vedat3 = 0u128;
+        if (is_account_registered<VEDAT3>(addr)) {
+            vedat3 = ((coin::balance<VEDAT3>(addr)) as u128);
+        };
+
         let genesis = borrow_global<GenesisInfo>(@dat3);
         //all staking
-        let pool_info = borrow_global_mut<PoolInfo>(@dat3);
 
         let your_s = simple_mapv1::borrow(&pool_info.data, &addr);
         let duration = your_s.duration + duration_more;
@@ -455,7 +463,7 @@ module dat3::dat3_stake {
         let boost = ((temp * pool.rate_of) + pool.rate_of_decimal) ;
 
 
-        let (total_staking, _staking, _duration, _flexible, all_simulate_reward, remaining_time_roi, apr, remaining_time_vedat3)
+        let (total_staking, all_simulate_reward, remaining_time_roi, apr, remaining_time_vedat3)
             = staking_calculator(
             addr,
             staking,
@@ -468,23 +476,26 @@ module dat3::dat3_stake {
             pool.rate_of,
             pool.rate_of_decimal
         );
-        (total_staking, staking, duration, flexible, current_rewards, start, (boost as u64), all_simulate_reward, remaining_time_roi, apr, (remaining_time_vedat3 + vedat3))
+        (staking, duration, flexible, current_rewards, start, (boost as u64), total_staking, all_simulate_reward, remaining_time_roi, apr, (remaining_time_vedat3 + vedat3))
     }
 
-    fun staking_calculator(addr: address,
-                           staking: u64,
-                           duration: u64,
-                           flexible: bool,
-                           start: u64,
-                           data: &SimpleMapV1<address, UserPosition>,
-                           now: u64,
-                           genesis_time: u64,
-                           rate_of: u128,
-                           rate_of_decimal: u128,
-    ): (u64, u64, u64, bool, u64, u64, u64, u64) {
+    fun staking_calculator(
+        addr: address,
+        staking: u64,
+        duration: u64,
+        flexible: bool,
+        start: u64,
+        data: &SimpleMapV1<address, UserPosition>,
+        now: u64,
+        genesis_time: u64,
+        rate_of: u128,
+        rate_of_decimal: u128,
+    )
+    : (u128, u128, u128, u128, u128, )
+    {
         //(total_staking, staking, duration, flexible, all_simulate_reward, roi, vedat3, (apr as u64))
-        let total_staking = staking;
-        let _vedat3 = 0u64;
+        let total_staking = (staking as u128);
+        let _vedat3 = 0u128;
         let time = (now as u128) + 1;
         let all_simulate_reward = 0u128;
         let you_user = simple_mapv1::borrow(data, &addr);
@@ -501,7 +512,7 @@ module dat3::dat3_stake {
             // check amount_staked,check duration ,check
             if (user.amount_staked > 0 && (user.duration > passed || user.flexible) && address != &addr) {
                 //All users who are staking
-                total_staking = total_staking + user.amount_staked;
+                total_staking = total_staking + (user.amount_staked as u128);
                 let temp_user_passed = (((time - (user.start_time as u128)) / SECONDS_OF_WEEK) as u64);
                 if (((user.duration > temp_user_passed) || user.flexible) && *address != addr) {
                     let temp = 0u128;
@@ -531,28 +542,28 @@ module dat3::dat3_stake {
             //Represents that there are currently staking
             if (you_user.already_reward > 0 && you_user.start_time > 0 && (((now - you_user.start_time) as u128) / SECONDS_OF_DAY) > 0) {
                 let actually_day = ((now - you_user.start_time) as u128) / SECONDS_OF_DAY   ;
-                let apr = (((you_user.already_reward as u128) * 365 * 100000000 / (staking as u128) / actually_day) as u64);
+                let apr = (you_user.already_reward as u128) * 365 * 100000000 / (staking as u128) / actually_day   ;
                 // let
-                let roi = (((you_user.already_reward as u128) * 100000000 / (staking as u128)) as u64);
+                let roi = (you_user.already_reward as u128) * 100000000 / (staking as u128)  ;
                 if (coin::is_account_registered<VEDAT3>(addr)) {
-                    _vedat3 = coin::balance<VEDAT3>(addr);
+                    _vedat3 = (coin::balance<VEDAT3>(addr) as u128) ;
                 };
-                _vedat3 = (my_today as u64);
+                _vedat3 = my_today  ;
                 let taday_r = today_mint * my_today / (today_volume + my_today);
-                return (total_staking, staking, duration, flexible, (taday_r as u64), roi, apr, _vedat3)
+                return (total_staking, taday_r, roi, apr, _vedat3)
 
                 //A trailing ';' in an expression block implicitly adds a '()' value after the semicolon. That '()' value will not be reachable
                 //     Any code after this expression will not be reached
             }else {
                 //   staking * y''      y''= (week*0.3836)+1
                 let taday_r = today_mint * my_today / (today_volume + my_today);
-                let apr = ((taday_r * 365 * 100000000 / (staking as u128)) as u64);
-                let roi = (((taday_r) * 100000000 / (staking as u128)) as u64);
+                let apr = taday_r * 365 * 100000000 / (staking as u128) ;
+                let roi = (taday_r) * 100000000 / (staking as u128) ;
                 if (coin::is_account_registered<VEDAT3>(addr)) {
-                    _vedat3 = coin::balance<VEDAT3>(addr);
+                    _vedat3 = ((coin::balance<VEDAT3>(addr)) as u128);
                 };
-                _vedat3 = (my_today as u64);
-                return (total_staking, staking, duration, flexible, (taday_r as u64), roi, apr, _vedat3)
+                _vedat3 = _vedat3 + my_today  ;
+                return (total_staking, taday_r, roi, apr, _vedat3)
             }
         };
 
@@ -607,7 +618,7 @@ module dat3::dat3_stake {
                     };
                 };
                 all_simulate_reward = all_simulate_reward + mint * your_stake_factor / _volume;
-                _vedat3 = _vedat3 + (your_stake_factor as u64);
+                _vedat3 = _vedat3 + your_stake_factor   ;
             };
 
             if ((maximum - i) != 1) {
@@ -624,14 +635,15 @@ module dat3::dat3_stake {
         // (a*365*c)/(b/c*c)
         // (a*365*c)/(b)
         // a*365*c/b
-        let apr = all_simulate_reward * 100000000 * 365 * SECONDS_OF_DAY / ((time - (start as u128)))  ;
+        let _apr = all_simulate_reward * 100000000 * 365 / ((time - (start as u128)) / SECONDS_OF_DAY)  ;
 
-        let roi = ((all_simulate_reward * 100000000 / (staking as u128)) as u64);
-        return (total_staking, staking, duration, flexible, (all_simulate_reward as u64), roi, (apr as u64), _vedat3)
+        let roi = all_simulate_reward * 100000000 / (staking as u128)   ;
+        return (total_staking, all_simulate_reward, roi, _apr, _vedat3)
     }
 
 
-    fun assert_mint_num(): u128 acquires GenesisInfo {
+    fun assert_mint_num(): u128 acquires GenesisInfo
+    {
         let gen = borrow_global<GenesisInfo>(@dat3);
         let now = timestamp::now_seconds();
         let year = ((now - gen.genesis_time) as u128) / SECONDS_OF_YEAR ;
@@ -645,7 +657,8 @@ module dat3::dat3_stake {
         return mint * math128::pow(10, (coin::decimals<DAT3>() as u128))
     }
 
-    fun simulate_mint(genesis_time: u64, now: u64): u128 {
+    fun simulate_mint(genesis_time: u64, now: u64): u128
+    {
         let year = ((now - genesis_time) as u128) / SECONDS_OF_YEAR ;
         let m = 1u128;
         let i = 0u128;
@@ -653,7 +666,7 @@ module dat3::dat3_stake {
             m = m * 2;
             i = i + 1;
         };
-        let mint = TOTAL_EMISSION / m  ;
+        let mint = TOTAL_EMISSION / m / 10  ;
         return mint * math128::pow(10, (coin::decimals<DAT3>() as u128))
     }
 }

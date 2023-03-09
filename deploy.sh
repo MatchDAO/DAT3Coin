@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x99a405da93573eefe6f294a66671ce06b71887883be849c86b3efc8f355fc66d'
+DAT3='0xaedd8a8933ba1fba08b9eff70e684ea11105438e5e5912ff9f53a0f409572933'
 PROFILE="devnet"
 echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd `

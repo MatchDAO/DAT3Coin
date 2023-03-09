@@ -17,6 +17,7 @@ module dat3::dat3_coin_boot {
 
     const PERMISSION_DENIED: u64 = 1000;
     const INVALID_ARGUMENT: u64 = 105;
+
     // Deploy code & store tempo resource signer
     public entry fun initializeWithResourceAccount(
         admin: &signer,
@@ -71,18 +72,8 @@ module dat3::dat3_coin_boot {
     //     string::utf8(str_b)
     // }
     #[test(dat3 = @dat3)]
-    fun test_resource_account(
-        dat3: &signer
-    ) {
-        // let temp_u64 = 8u64;
-        // let str = intToString(temp_u64);
-        // let app = string::utf8(b"ad98 #");
-        // let u = string::internal_check_utf8(string::bytes(&str))  ;
-        //
-        // string::append(&mut app, str);
-        // debug::print(&u);
-        // debug::print(&str);
-        // debug::print(&app);
+    fun test_resource_account(dat3: &signer)
+    {
         let (_, signer_cap) =
             account::create_resource_account(dat3, b"dat3");
         let (_, signer_cap2) =
