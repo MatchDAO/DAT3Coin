@@ -362,8 +362,26 @@ module dat3::dat3_manager {
         dat3_pool::init_pool(dat3);
         coin::register<DAT3>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
-
         dat3_pool_routel::init(dat3);
+        let ssssss=  dat3_pool_routel::change_sys_fid(dat3,999u64,
+            false,string::utf8(b"t1"),string::utf8(b"c1"));
+
+        dat3_pool_routel::user_init(dat3, 999,
+            100 );
+        // user: &signer, fid: u64, del: bool, token: String, collection: String
+        dat3_pool_routel::change_sys_fid(dat3,100,false,string::utf8(b"t1"),string::utf8(b"c1"));
+        let (v1,v2,v3,v4,v5,v6 )= dat3_pool_routel::fid_reward(100);
+        // let (v1,v2,v3,v4,v5,v6,v7,v8)=dat3_pool_routel::assets(addr);
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        // debug::print(&v7);
+        // debug::print(&v8);
+
+
         // dat3_pool_routel::change_sys_fid(dat3, 123, false);
         // dat3_pool_routel::user_init(dat3, 123, 12);
         let time = borrow_global<GenesisInfo>(addr).genesis_time;
@@ -497,7 +515,8 @@ module dat3::dat3_manager {
         // debug::print(&v11);
     }
 
-    fun u64_to_string(value: u64): String {
+    fun u64_to_string(value: u64): String
+    {
         if (value == 0) {
             return utf8(b"0")
         };

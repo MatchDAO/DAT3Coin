@@ -155,13 +155,11 @@ module dat3::dat3_pool_routel {
     ) acquires FidStore, UsersReward, UsersTotalConsumption
     {
         let user_address = signer::address_of(account);
-        // todo check fid
         //cheak_fid
         assert!(fid > 0, error::invalid_argument(INVALID_ID));
         let fs = borrow_global_mut<FidStore>(@dat3);
 
         assert!(simple_mapv1::contains_key(&fs.data, &fid), error::invalid_argument(INVALID_ARGUMENT));
-        assert!(!exists<Member>(user_address), error::already_exists(ALREADY_EXISTS));
 
         //init UsersReward
         let user_r = borrow_global_mut<UsersReward>(@dat3);
@@ -178,6 +176,9 @@ module dat3::dat3_pool_routel {
         if (!coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
             coin::register<0x1::aptos_coin::AptosCoin>(account);
         };
+        if (!coin::is_account_registered<DAT3>(user_address)) {
+            coin::register<DAT3>(account);
+        };
         if (!exists<MsgSender>(user_address)) {
             move_to(account, MsgSender { serders: vector::empty<address>() });
         };
@@ -186,14 +187,18 @@ module dat3::dat3_pool_routel {
         };
 
         let fidr = simple_mapv1::borrow_mut(&mut fs.data, &fid);
-        vector::push_back(&mut fidr.users, user_address);
-        move_to(account, Member {
-            uid,
-            fid,
-            freeze: 0u64,
-            amount: 0u64,
-            mFee: 1,
-        });
+        if (!vector::contains(&mut fidr.users, &user_address)) {
+            vector::push_back(&mut fidr.users, user_address);
+        };
+        if (!exists<Member>(user_address)) {
+            move_to(account, Member {
+                uid,
+                fid,
+                freeze: 0u64,
+                amount: 0u64,
+                mFee: 1,
+            });
+        };
     }
 
     #[view]
@@ -256,14 +261,17 @@ module dat3::dat3_pool_routel {
 
         let contains = simple_mapv1::contains_key(&f.data, &fid);
         if (contains) {
+            let fr = simple_mapv1::borrow_mut(&mut f.data, &fid);
             if (del) {
-                let fr = simple_mapv1::borrow(&f.data, &fid);
                 assert!(fr.amount == 0
                     && vector::length(&fr.users) == 0
                     && fr.earn == 0
                     && fr.spend == 0
                     && fr.amount == 0, error::permission_denied(ALREADY_EXISTS));
                 simple_mapv1::remove(&mut f.data, &fid);
+            }else {
+                fr.collection = collection;
+                fr.token = token;
             };
         }else {
             if (!del) {
@@ -484,25 +492,38 @@ module dat3::dat3_pool_routel {
     public fun assets(addr: address): (u64, u64, u64, u64, u64, u64, u64, u64)
     acquires Member, UsersReward
     {
-        assert!(exists<Member>(addr), error::not_found(NO_USER));
-        let user = borrow_global<Member>(addr) ;
+        let _uid = 0u64;
+        let _fid = 0u64;
+        let _mFee = 0u64;
+        let _amount = 0u64;
+        if (exists<Member>(addr)) {
+            let user = borrow_global<Member>(addr) ;
+            _uid = user.uid;
+            _fid = user.fid;
+            _uid = user.mFee;
+            _amount = user.amount;
+        } ;
+
         let user_r = borrow_global<UsersReward>(@dat3);
-        let reward: u64 = 0;
-        let claim: u64 = 0;
+        let _reward: u64 = 0;
+        let _claim: u64 = 0;
         if (simple_mapv1::contains_key(&user_r.data, &addr)) {
             let your_reward = simple_mapv1::borrow(&user_r.data, &addr);
-            reward = your_reward.reward;
-            claim = your_reward.claim
+            _reward = your_reward.reward;
+            _claim = your_reward.claim
+        }else {
+            _reward = 0;
+            _claim = 0;
         };
-        let apt = 0u64;
+        let _apt = 0u64;
         let dat3 = 0u64;
         if (coin::is_account_registered<0x1::aptos_coin::AptosCoin>(addr)) {
-            apt = coin::balance<0x1::aptos_coin::AptosCoin>(addr)
+            _apt = coin::balance<0x1::aptos_coin::AptosCoin>(addr)
         };
         if (coin::is_account_registered<DAT3>(addr)) {
             dat3 = coin::balance<DAT3>(addr)
-        };
-        (user.uid, user.fid, user.mFee, apt, dat3, user.amount, reward, claim)
+        } ;
+        (_uid, _fid, _mFee, _apt, dat3, _amount, _reward, _claim)
     }
 
 
