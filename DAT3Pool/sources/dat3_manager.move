@@ -94,7 +94,8 @@ module dat3::dat3_manager {
     const MAX_SUPPLY_AMOUNT: u64 = 5256000 ;
     //365
     const SECONDS_OF_YEAR: u128 = 31536000 ;
-
+    //ONE DAY
+    const SECONDS_OF_DAY: u64 = 86400 ;
     const TOTAL_EMISSION: u128 = 7200;
     //0.7
     const TALK_EMISSION: u128 = 5040;
@@ -339,8 +340,22 @@ module dat3::dat3_manager {
         let last = borrow_global_mut<MintTime>(@dat3);
         last.supplyAmount = (mint_amount as u64) + last.supplyAmount;
     }
-
-
+    #[view]
+    public  fun genesis_info():(u64,u128,u64) acquires  MintTime, GenesisInfo
+    {
+        let last = borrow_global<MintTime>(@dat3);
+        let gen = borrow_global<GenesisInfo>(@dat3);
+        let now = timestamp::now_seconds();
+        let year = ((now - gen.genesis_time) as u128) / SECONDS_OF_YEAR ;
+        let m = 1u128;
+        let i = 0u128;
+        while (i < year) {
+            m = m * 2;
+            i = i + 1;
+        };
+        let mint = TOTAL_EMISSION / m  ;
+        (gen.genesis_time,mint,(last.time+ SECONDS_OF_DAY))
+    }
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
     fun dat3_coin_init(dat3: &signer, to: &signer, fw: &signer) acquires HodeCap, MintTime, GenesisInfo
     {

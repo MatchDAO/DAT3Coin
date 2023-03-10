@@ -12,6 +12,7 @@ module dat3::dat3_pool_routel {
     use dat3::simple_mapv1::{Self, SimpleMapV1};
     use aptos_token::token;
     use std::string::String;
+    use dat3::dat3_stake::GenesisInfo;
 
     struct Member has key, store {
         uid: u64,
@@ -19,6 +20,7 @@ module dat3::dat3_pool_routel {
         freeze: u64,
         amount: u64,
         mFee: u64,
+        earn: u64,
     }
 
     struct FeeStore has key, store {
@@ -43,6 +45,9 @@ module dat3::dat3_pool_routel {
     struct Reward has drop, key, store {
         reward: u64,
         claim: u64,
+        every_reward: vector<u64>,
+        every_reward_time: vector<u64>,
+
         //Invalid variable usage. Unbound variable 'pool_info'
     }
 
@@ -114,6 +119,7 @@ module dat3::dat3_pool_routel {
     {
         let user_address = signer::address_of(account);
         assert!(user_address == @dat3, error::permission_denied(PERMISSION_DENIED));
+
         assert!(!exists<UsersReward>(user_address), error::already_exists(ALREADY_EXISTS));
         assert!(!exists<UsersTotalConsumption>(user_address), error::already_exists(ALREADY_EXISTS));
         assert!(!exists<FidStore>(user_address), error::already_exists(ALREADY_EXISTS));
@@ -165,7 +171,7 @@ module dat3::dat3_pool_routel {
         let user_r = borrow_global_mut<UsersReward>(@dat3);
         if (!simple_mapv1::contains_key(&user_r.data, &user_address)) {
             simple_mapv1::add(&mut user_r.data, user_address, Reward {
-                reward: 0, claim: 0
+                reward: 0, claim: 0, every_reward: vector::empty<u64>(), every_reward_time: vector::empty<u64>()
             });
         };
         //init UsersTotalConsumption
@@ -197,6 +203,7 @@ module dat3::dat3_pool_routel {
                 freeze: 0u64,
                 amount: 0u64,
                 mFee: 1,
+                earn: 0
             });
         };
     }
@@ -301,6 +308,17 @@ module dat3::dat3_pool_routel {
         return (0, 0, 0, 0, 0, 0)
     }
 
+    #[view]
+    public fun fid_reward_invite(fid: u64): vector<address> acquires FidStore
+    {
+        assert!(exists<FidStore>(@dat3), error::not_found(NOT_FOUND));
+        let f = borrow_global<FidStore>(@dat3);
+        if (simple_mapv1::contains_key(&f.data, &fid)) {
+            let fr = simple_mapv1::borrow(&f.data, &fid);
+            return fr.users
+        };
+        return vector::empty<address>()
+    }
 
     fun cheak_fid(fid: u64): bool acquires FidStore
     {
@@ -341,12 +359,15 @@ module dat3::dat3_pool_routel {
         assert!(exists<MsgSender>(sender), error::not_found(NO_TO_USER));
         let m1 = borrow_global<MsgSender>(to);
         let m2 = borrow_global<MsgSender>(sender);
+        //is
         if (vector::contains(&m1.serders, &sender)) {
             return 1u64
         };
+        //no
         if (vector::contains(&m2.serders, &to)) {
             return 2u64
         };
+        //is
         return 3u64
     }
 
@@ -392,6 +413,7 @@ module dat3::dat3_pool_routel {
             let your = simple_mapv1::borrow_mut(&mut total.data, &user_address);
             *your = *your + fee_s.chatFee;
             //fid_re(fid: u64, den: u128, num: u128, amount: u64, s: bool)
+
             fid_re(auser.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, fee_s.chatFee, true);
         }else {
             //is receiver
@@ -413,6 +435,7 @@ module dat3::dat3_pool_routel {
                 if (re > 0) {
                     let earn = (((re as u128) * 70 / 100) as u64);
                     auser.amount = auser.amount + earn;
+                    auser.earn = auser.earn + earn;
                     //earn
                     fid_re(auser.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, earn, false);
                 };
@@ -458,7 +481,7 @@ module dat3::dat3_pool_routel {
             };
             dat3_pool::withdraw_reward(user_address, amount);
             your.reward = your.reward - amount;
-            your.claim = your.claim + amount
+            your.claim = your.claim + amount;
         };
     }
 
@@ -526,6 +549,27 @@ module dat3::dat3_pool_routel {
         (_uid, _fid, _mFee, _apt, dat3, _amount, _reward, _claim)
     }
 
+    #[view]
+    public fun reward_recode(addr: address): (u64, u64, vector<u64>,vector<u64>, )
+    acquires Member, UsersReward
+    {
+        let _earn = 0u64;
+        let _dat3=0u64;
+        let _every_reward_time= vector::empty<u64>();
+        let _every_reward= vector::empty<u64>();
+        if (exists<Member>(addr)) {
+            let user = borrow_global<Member>(addr) ;
+            _earn = user.earn;
+            let ueer_r=borrow_global<UsersReward>(@dat3);
+            if(simple_mapv1::contains_key(&ueer_r.data, &addr)){
+               let r= simple_mapv1::borrow(&ueer_r.data, &addr);
+                _dat3= r.claim+r.claim;
+                _every_reward_time= r.every_reward_time;
+                _every_reward= r.every_reward;
+            };
+        } ;
+        (_earn, _dat3, _every_reward_time, _every_reward)
+    }
 
     fun assert_room_state(addr: address): u8 acquires RoomState
     {
@@ -688,6 +732,7 @@ module dat3::dat3_pool_routel {
         let rec_user = borrow_global_mut<Member>(receiver);
         rec_user.amount = rec_user.amount + (((to_rec * 70 as u128) / (100u128)) as u64);
         let fee_s = borrow_global<FeeStore>(@dat3);
+        rec_user.earn = rec_user.earn + (((to_rec * 70 as u128) / (100u128)) as u64);
         //earn
         fid_re(
             rec_user.fid,
