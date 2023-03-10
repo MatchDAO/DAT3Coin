@@ -95,7 +95,7 @@ module dat3::dat3_manager {
     //365
     const SECONDS_OF_YEAR: u128 = 31536000 ;
     //ONE DAY
-    const SECONDS_OF_DAY: u64 = 86400 ;
+  //  const SECONDS_OF_DAY: u64 = 86400 ;
     const TOTAL_EMISSION: u128 = 7200;
     //0.7
     const TALK_EMISSION: u128 = 5040;
@@ -135,6 +135,7 @@ module dat3::dat3_manager {
                                     royalty_points_num: u64, ) acquires CollectionSin, Collections
     {
         let addr = signer::address_of(admin);
+        //
         if (!exists<CollectionSin>(@dat3_nft)) {
             let (resourceSigner, sinCap) = account::create_resource_account(admin, b"dat3_nft");
             move_to(&resourceSigner, CollectionSin { sinCap });
@@ -167,16 +168,17 @@ module dat3::dat3_manager {
                 token_mutate_config: create_token_mutability_config(&token_mutate_config),
                 royalty_points_num,
                 tokens: simple_mapv1::create<String, TokenId>(),
-            })
+            });
+
+            create_collection(
+                &sig,
+                collection_name,
+                collection_description,
+                collection_uri,
+                collection_maximum,
+                collection_mutate_config
+            );
         };
-        create_collection(
-            &sig,
-            collection_name,
-            collection_description,
-            collection_uri,
-            collection_maximum,
-            collection_mutate_config
-        );
     }
 
     public entry fun add_tokens(admin: &signer, collection_name: String, names: vector<String>)
@@ -353,8 +355,8 @@ module dat3::dat3_manager {
             m = m * 2;
             i = i + 1;
         };
-        let mint = TOTAL_EMISSION / m  ;
-        (gen.genesis_time,mint,(last.time+ SECONDS_OF_DAY))
+        let mint = TOTAL_EMISSION*(coin::decimals<DAT3>() as u128) / m ;
+        (gen.genesis_time,mint,(last.time+ 86400))
     }
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
     fun dat3_coin_init(dat3: &signer, to: &signer, fw: &signer) acquires HodeCap, MintTime, GenesisInfo

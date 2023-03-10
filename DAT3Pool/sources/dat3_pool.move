@@ -29,7 +29,7 @@ module dat3::dat3_pool {
         withdraw_state_events: EventHandle<WithdrawStateEvent>,
     }
 
-    struct RewardPool  has key { coins: Coin<DAT3>, }
+    struct RewardPool  has key { last: u64, coins: Coin<DAT3>, }
 
     struct ActivePool  has key, store { coins: Coin<DAT3> }
 
@@ -62,6 +62,7 @@ module dat3::dat3_pool {
         });
         if (!exists<RewardPool>(addr)) {
             move_to(account, RewardPool {
+                last: 0,
                 coins: coin::zero<DAT3>(),
             });
         };
@@ -102,10 +103,12 @@ module dat3::dat3_pool {
     {
         if (!exists<RewardPool>(@dat3)) {
             move_to(account, RewardPool {
+                last: 0,
                 coins: coin::zero<DAT3>(),
             });
         };
         let r_pool = borrow_global_mut<RewardPool>(@dat3);
+        r_pool.last=coin::value<DAT3>(&coins);
         coin::merge(&mut r_pool.coins, coins);
     }
 
@@ -134,6 +137,10 @@ module dat3::dat3_pool {
         coin::deposit<DAT3>(to, coin::extract(&mut r_pool.coins, amount));
     }
 
+    public(friend) fun withdraw_reward_last(): u64 acquires RewardPool
+    {
+        borrow_global<RewardPool>(@dat3).last
+    }
 
     // Distribution              Reward/block($DAT3) Reward/day($DAT3)
     // Talk Emission             0.7                 ~5040
@@ -149,6 +156,4 @@ module dat3::dat3_pool {
         let _r_pool = borrow_global_mut<RewardPool>(@dat3);
         // coin::merge(&mut r_pool.coins, coin);
     }
-
-
 }

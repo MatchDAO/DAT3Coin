@@ -72,6 +72,7 @@ module dat3::dat3_stake {
     const ONE_W: u64 = 604800;
 
 
+    //init
     public entry fun init(sender: &signer, time: u64)
     {
         let addr = signer::address_of(sender);
@@ -114,6 +115,7 @@ module dat3::dat3_stake {
         };
     }
 
+    //more_stake
     public entry fun more_stake(sender: &signer, amount: u64) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
@@ -134,6 +136,7 @@ module dat3::dat3_stake {
         }
     }
 
+    //more_duration
     public entry fun more_duration(sender: &signer, duration: u64) acquires Pool, PoolInfo
     {
         let addr = signer::address_of(sender);
