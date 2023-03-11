@@ -12,7 +12,7 @@ module dat3::dat3_stake {
     use vedat3::vedat3_coin::VEDAT3;
 
     use dat3::dat3_coin::DAT3;
-    use dat3::dat3_coin_boot;
+    //use dat3::dat3_coin_boot;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
     friend dat3::dat3_manager;
 
@@ -82,8 +82,8 @@ module dat3::dat3_stake {
         };
         if (!exists<Pool>(addr)) {
             //test
-            // let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
-            let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
+             let (_s, module_authority) = account::create_resource_account(sender, b"dat3");
+            //let module_authority = dat3_coin_boot::retrieveResourceSignerCap(sender);
             let auth_signer = account::create_signer_with_capability(&module_authority);
             let (burn, freeze, mint) = coin::initialize<VEDAT3>(&auth_signer,
                 string::utf8(b"veDAT3 Coin"),

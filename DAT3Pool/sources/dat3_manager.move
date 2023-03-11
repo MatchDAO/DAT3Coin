@@ -546,6 +546,100 @@ module dat3::dat3_manager {
         debug::print(&v11);
     }
 
+    #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
+    fun dat3_routel_call(dat3: &signer, to: &signer, fw: &signer) acquires HodeCap, MintTime, GenesisInfo
+    {
+        timestamp::set_time_has_started_for_testing(fw);
+         timestamp::update_global_time_for_test(1);
+
+        let addr = signer::address_of(dat3);
+        let to_addr = signer::address_of(to);
+        create_account(addr);
+        create_account(to_addr);
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(fw);
+        coin::deposit(signer::address_of(dat3), coin::mint(100000000, &mint_cap));
+        coin::deposit(signer::address_of(dat3), coin::mint(100000000, &mint_cap));
+
+        init_dat3_coin(dat3);
+        dat3_pool::init_pool(dat3);
+        coin::register<DAT3>(dat3);
+        coin::register<0x1::aptos_coin::AptosCoin>(dat3);
+        debug::print(&is_account_registered<DAT3>(addr));
+        dat3_pool_routel::init(dat3);
+        dat3_pool_routel::change_sys_fid(dat3,999u64,
+            false,string::utf8(b"t999"),string::utf8(b"c999"));
+        dat3_pool_routel::change_sys_fid(dat3,998u64,
+            false,string::utf8(b"t998"),string::utf8(b"c998"));
+
+        dat3_pool_routel::user_init(dat3, 999,
+            100 );
+        dat3_pool_routel::user_init(to, 998,
+            100 );
+        // user: &signer, fid: u64, del: bool, token: String, collection: String
+        dat3_pool_routel::change_sys_fid(dat3,100,false,string::utf8(b"t1"),string::utf8(b"c1"));
+        dat3_pool_routel::deposit(dat3,10000000);
+        debug::print(&dat3_pool_routel::is_sender(addr,to_addr));
+
+
+       // debug::print(&(((1000000 as u128) * 500  / 100000)));
+        dat3_pool_routel::call_1(dat3,to_addr);
+        dat3_pool_routel::call_1(to,addr);
+         let (v1,v2,v3,v4,v5,v6,v7,v8,v9)=dat3_pool_routel::assets(addr);
+        debug::print(&string::utf8(b"begin11111"));
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        debug::print(&v7);
+        debug::print(&v8);
+        debug::print(&v9);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+        debug::print(&string::utf8(b"begin22222"));
+        let (v1,v2,v3,v4,v5,v6 )= dat3_pool_routel::fid_reward(999);
+        // let (v1,v2,v3,v4,v5,v6,v7,v8)=dat3_pool_routel::assets(addr);
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        dat3_pool_routel::to_reward(dat3);
+        let (v1,v2,v3,v4)=dat3_pool_routel::reward_recode(to_addr);
+        debug::print(&string::utf8(b"begin3333333333"));
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        dat3_pool_routel::create_rome(dat3,to_addr);
+        timestamp::update_global_time_for_test(1100000);
+        debug::print(& timestamp::now_seconds());
+        dat3_pool_routel::join_room(to,addr,true);
+        timestamp::update_global_time_for_test(8100000);
+        dat3_pool_routel::one_minute(dat3);
+        let (v1,v2,v3,v4,v5,v6,v7,v8)= dat3_pool_routel::remaining_time(addr);
+        debug::print(&string::utf8(b"begin44444444444444"));
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        debug::print(&v7);
+        debug::print(&v8);
+        dat3_pool_routel::close_room(to,addr,to_addr);
+
+        let (v1,v2,v3,v4)=dat3_pool_routel::reward_recode(to_addr);
+        debug::print(&string::utf8(b"begin5555555"));
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+
+    }
+
     fun u64_to_string(value: u64): String
     {
         if (value == 0) {

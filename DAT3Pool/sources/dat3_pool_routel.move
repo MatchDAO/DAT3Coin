@@ -159,7 +159,7 @@ module dat3::dat3_pool_routel {
             i = i + 1;
         };
         leng = vector::length(&users);
-        index = 0;
+        i = 0;
         let coins = dat3_pool::withdraw_reward_last();
         if (leng > 0) {
             let now = timestamp::now_seconds();
@@ -381,7 +381,7 @@ module dat3::dat3_pool_routel {
             let user = borrow_global<Member>(addr) ;
             _uid = user.uid;
             _fid = user.fid;
-            _uid = user.mFee;
+            _mFee = user.mFee;
             _amount = user.amount;
         } ;
 
@@ -510,7 +510,7 @@ module dat3::dat3_pool_routel {
         let req_member = borrow_global_mut<Member>(user_address);
 
         let is_sender = is_sender(user_address, to);
-        assert!(is_sender > 3, error::not_found(NO_TO_USER));
+        assert!(is_sender <4, error::not_found(NO_TO_USER));
 
         //is_sender Deduction chatFee and add TotalConsumption
         if (is_sender == 1 || is_sender == 3) {
@@ -524,10 +524,10 @@ module dat3::dat3_pool_routel {
             };
             //Record the time of each message
             if (!simple_mapv1::contains_key(&to_msg_hoder.receiver, &user_address)) {
-                vector::push_back(
-                    simple_mapv1::borrow_mut(&mut to_msg_hoder.receiver, &user_address),
-                    timestamp::now_seconds()
-                )
+               let ho=vector::empty<u64>();
+                vector::push_back(&mut ho, timestamp::now_seconds());
+                simple_mapv1::add(&mut to_msg_hoder.receiver,user_address,ho);
+
             }else {
                 let vec = vector::empty<u64>();
                 vector::push_back(&mut vec, timestamp::now_seconds());
@@ -581,7 +581,7 @@ module dat3::dat3_pool_routel {
         let f = borrow_global_mut<FidStore>(@dat3);
         if (simple_mapv1::contains_key(&f.data, &fid)) {
             let fr = simple_mapv1::borrow_mut(&mut f.data, &fid);
-            let val = (((amount as u128) * den / num) as u64);
+            let val = (((amount as u128) / den  * num) as u64);
             if (is_spend) {
                 fr.spend = fr.spend + val;
             }else {
@@ -600,8 +600,8 @@ module dat3::dat3_pool_routel {
         if (!simple_mapv1::contains_key(&data.data, &addr)) {
             simple_mapv1::add(&mut data.data, addr, state);
         }else {
-            let s = simple_mapv1::borrow_mut(&mut data.data, &addr);
-            *s = state;
+            let _s = simple_mapv1::borrow_mut(&mut data.data, &addr);
+            _s = &mut state;
         };
     }
 
@@ -624,7 +624,7 @@ module dat3::dat3_pool_routel {
         //get req_member
         let req_member = borrow_global<Member>(requester_addr) ;
         //get fee
-        let fee_store = borrow_global<FeeStore>(receiver) ;
+        let fee_store = borrow_global<FeeStore>(@dat3) ;
         let fee = simple_mapv1::borrow(&fee_store.mFee, &req_member.mFee);
         //Deposit funds to rome extract amount
         if (exists<Room>(requester_addr)) {
@@ -716,7 +716,7 @@ module dat3::dat3_pool_routel {
         //check req state
         assert!(req_session.started_at > 0, error::invalid_state(INVALID_ROOM_STATE));
         //check rec state
-        assert!(assert_room_state(requester_addr) == 0, error::invalid_state(INVALID_ROOM_STATE));
+        assert!(assert_room_state(requester_addr) > 0, error::invalid_state(INVALID_ROOM_STATE));
         let req_user = borrow_global_mut<Member>(requester_addr);
         //check req_user balance
         assert!(req_user.amount >= req_session.minute_rate, error::aborted(EINSUFFICIENT_BALANCE));
@@ -736,7 +736,7 @@ module dat3::dat3_pool_routel {
         assert!(exists<Member>(receiver), error::not_found(NO_USER));
         assert!(exists<Member>(receiver), error::not_found(NO_USER));
         assert!(exists<Room>(requester), error::invalid_state(INVALID_RECEIVER));
-        let req = borrow_global_mut<Room>(receiver);
+        let req = borrow_global_mut<Room>(requester);
         //check done
         assert!(!req.done, error::invalid_state(INVALID_ROOM_STATE));
         //check receiver
