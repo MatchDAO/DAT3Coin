@@ -362,7 +362,7 @@ module dat3::dat3_manager {
             i = i + 1;
         };
         let mint = TOTAL_EMISSION * (coin::decimals<DAT3>() as u128) / m ;
-        (gen.genesis_time, mint, (last.time + 86400))
+        (gen.genesis_time, mint,  last.time   )
     }
 
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
@@ -581,6 +581,7 @@ module dat3::dat3_manager {
 
         let addr = signer::address_of(dat3);
         let to_addr = signer::address_of(to);
+        let _aptos=signer::address_of(fw);
         create_account(addr);
         create_account(to_addr);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(fw);
@@ -593,25 +594,19 @@ module dat3::dat3_manager {
         coin::register<0x1::aptos_coin::AptosCoin>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
         dat3_pool_routel::init(dat3);
-        dat3_pool_routel::change_sys_fid(dat3, 999u64,
-            false, string::utf8(b"t999"), string::utf8(b"c999"));
-        dat3_pool_routel::change_sys_fid(dat3, 998u64,
-            false, string::utf8(b"t998"), string::utf8(b"c998"));
+        dat3_pool_routel::user_init(dat3, 999, 100);
+        dat3_pool_routel::user_init(to, 998, 100);
+        dat3_pool_routel::deposit(dat3, 1000000000);
+        debug::print(&(((1000000 as u128) * 500  / 100000)));
+        debug::print(&string::utf8(b"00000000000000000000"));
+        debug::print(&dat3_pool_routel::call_1(dat3, to_addr));
+        debug::print(&dat3_pool_routel::call_1(dat3, to_addr));
+        debug::print(&dat3_pool_routel::is_sender(to_addr, addr));
+         debug::print(&dat3_pool_routel::call_1(to, addr));
 
-        dat3_pool_routel::user_init(dat3, 999,
-            100);
-        // dat3_pool_routel::user_init(to, 998,
-        //     100);
-        // user: &signer, fid: u64, del: bool, token: String, collection: String
-        dat3_pool_routel::change_sys_fid(dat3, 100, false, string::utf8(b"t1"), string::utf8(b"c1"));
-        dat3_pool_routel::deposit(dat3, 10000000);
-        debug::print(&dat3_pool_routel::is_sender(addr, to_addr));
-
-
-        // debug::print(&(((1000000 as u128) * 500  / 100000)));
-        dat3_pool_routel::call_1(dat3, to_addr);
         // dat3_pool_routel::call_1(to, addr);
-        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) = dat3_pool_routel::assets(to_addr);
+        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) =
+            dat3_pool_routel::assets(to_addr);
         debug::print(&string::utf8(b"begin11111"));
         debug::print(&v1);
         debug::print(&v2);
@@ -626,28 +621,53 @@ module dat3::dat3_manager {
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
         debug::print(&string::utf8(b"begin22222"));
-        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::fid_reward(999);
-        // let (v1,v2,v3,v4,v5,v6,v7,v8)=dat3_pool_routel::assets(addr);
+        let (v1, v2, v3, v4, v5, v6) =
+            dat3_pool_routel::fid_reward(999);
         debug::print(&v1);
         debug::print(&v2);
         debug::print(&v3);
         debug::print(&v4);
         debug::print(&v5);
         debug::print(&v6);
-        dat3_pool_routel::to_reward(dat3);
-        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::reward_record(to_addr);
-        debug::print(&string::utf8(b"begin3333333333"));
+        let (v1, v2, v3, v4, v5, v6) =
+            dat3_pool_routel::fid_reward(998);
         debug::print(&v1);
         debug::print(&v2);
         debug::print(&v3);
         debug::print(&v4);
         debug::print(&v5);
         debug::print(&v6);
+        // dat3_pool_routel::to_reward(dat3);
+        // let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::reward_record(to_addr);
+        // debug::print(&string::utf8(b"begin3333333333"));
+        // debug::print(&v1);
+        // debug::print(&v2);
+        // debug::print(&v3);
+        // debug::print(&v4);
+        // debug::print(&v5);
+        // debug::print(&v6);
         timestamp::update_global_time_for_test(1100000);
         debug::print(&timestamp::now_seconds());
 
         timestamp::update_global_time_for_test(8100000);
         dat3_pool_routel::one_minute(dat3,to_addr);
+       // dat3_pool_routel::one_minute(dat3,to_addr);
+        let (v1, v2, v3, v4, v5, v6) =
+            dat3_pool_routel::fid_reward(999);
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        let (v1, v2, v3, v4, v5, v6) =
+            dat3_pool_routel::fid_reward(998);
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
         let v1 = dat3_pool_routel::remaining_time(addr);
         debug::print(&string::utf8(b"begin44444444444444"));
         debug::print(&v1);

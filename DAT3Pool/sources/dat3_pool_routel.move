@@ -57,7 +57,7 @@ module dat3::dat3_pool_routel {
         amount: u64,
     }
 
-    struct MsgHoder has key, store {
+    struct MsgHoder has copy,drop, key, store {
         senders: vector<address>,
         receive: SimpleMapV1<address, vector<u64>>
     }
@@ -197,7 +197,7 @@ module dat3::dat3_pool_routel {
         account: &signer,
         fid: u64,
         uid: u64
-    ) acquires FidStore, UsersReward, MemberStore
+    ) acquires FidStore, UsersReward, MemberStore, DAT3MsgHoder
     {
         let user_address = signer::address_of(account);
         if (!coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
@@ -214,7 +214,7 @@ module dat3::dat3_pool_routel {
         user_address: address,
         fid: u64,
         uid: u64
-    ) acquires FidStore, UsersReward, MemberStore
+    ) acquires FidStore, UsersReward, MemberStore, DAT3MsgHoder
     {
         //cheak_fid
         assert!(fid >= 0 && fid <= 5000, error::invalid_argument(INVALID_ID));
@@ -269,6 +269,14 @@ module dat3::dat3_pool_routel {
                 user.fid = fid;
             };
         };
+        let dat3_msg = borrow_global_mut<DAT3MsgHoder>(@dat3);
+        if (!simple_mapv1::contains_key(&dat3_msg.data, &user_address)) {
+            simple_mapv1::add(&mut dat3_msg.data, user_address, MsgHoder {
+                senders:vector::empty<address>(),
+                receive:simple_mapv1::create<address, vector<u64>>(),
+            });
+        };
+
     }
 
     // deposit coin to pool
@@ -533,29 +541,32 @@ module dat3::dat3_pool_routel {
     public fun is_sender(sender: address, to: address): u64
     acquires DAT3MsgHoder {
         let s = borrow_global<DAT3MsgHoder>(@dat3);
-        if (!simple_mapv1::contains_key(&s.data, &sender)) {
-            return 4u64
-        };
         if (!simple_mapv1::contains_key(&s.data, &to)) {
             return 5u64
         };
+        if (!simple_mapv1::contains_key(&s.data, &sender)) {
+            return 4u64
+        };
+
 
         let m1 = simple_mapv1::borrow(&s.data, &sender);
         let m2 = simple_mapv1::borrow(&s.data, &to);
         //is
-        if (vector::contains(&m1.senders, &sender)) {
+        if (vector::contains(&m2.senders, &sender)) {
             return 1u64
         };
-        //no
-        if (vector::contains(&m2.senders, &to)) {
+       //no
+        if (vector::contains(&m1.senders, &to)) {
             return 2u64
         };
+
+
         //is
         return 3u64
     }
 
     //
-    public entry fun call_1(account: &signer, to: address)
+    public entry  fun call_1(account: &signer, to: address):u64
     acquires FeeStore, FidStore, UsersReward, DAT3MsgHoder, MemberStore
     {
         let user_address = signer::address_of(account);
@@ -569,13 +580,23 @@ module dat3::dat3_pool_routel {
         let dat3_msg = borrow_global_mut<DAT3MsgHoder>(@dat3);
         //is_sender Deduction chatFee and add TotalConsumption
         if (is_sender == 1 || is_sender == 3 || is_sender == 5) {
-            let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
-            //check balance
-            assert!(req_member.amount >= fee_s.chatFee, error::out_of_range(EINSUFFICIENT_BALANCE));
-            //borrow_mut to_msg_hoder
-
             //init hoder
             if (is_sender == 5) {
+                //init UsersReward
+                let user_r = borrow_global_mut<UsersReward>(@dat3);
+                simple_mapv1::add(&mut user_r.data, to, Reward {
+                    total_spend: 0u64,
+                    taday_spend: 0, earn: 0, reward: 0, reward_claim: 0, every_dat3_reward: vector::empty<u64>(
+                    ), every_dat3_reward_time: vector::empty<u64>()
+                });
+                //add member
+                simple_mapv1::add(&mut member_store.member, to, Member {
+                    addr: to,
+                    uid: 0u64,
+                    fid: 0u64,
+                    amount: 0,
+                    mFee: 1,
+                });
                 //init to MsgHoder
                 let senders = vector::empty<address>();
                 vector::push_back(&mut senders, user_address);
@@ -586,6 +607,12 @@ module dat3::dat3_pool_routel {
                     receive,
                 });
             };
+            let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
+            //check balance
+            assert!(req_member.amount >= fee_s.chatFee, error::out_of_range(EINSUFFICIENT_BALANCE));
+            //borrow_mut to_msg_hoder
+
+
             //add sender init receiver
             if (is_sender == 3) {
                 //add sender
@@ -600,13 +627,13 @@ module dat3::dat3_pool_routel {
             let req_receive = simple_mapv1::borrow_mut(&mut to_hoder.receive, &user_address);
             vector::push_back(req_receive, timestamp::now_seconds());
             req_member.amount = req_member.amount - fee_s.chatFee;
-            return
+
         };
         //receiver
         if (is_sender == 2) {
             //is receiver
             //get msg_hoder of receiver
-            let msg_hoder = simple_mapv1::borrow_mut(&mut dat3_msg.data, &to);
+            let msg_hoder = simple_mapv1::borrow_mut(&mut dat3_msg.data, &user_address);
             let receive = simple_mapv1::borrow_mut(&mut msg_hoder.receive, &to);
             let leng = vector::length(receive);
             if (leng > 0) {
@@ -637,13 +664,14 @@ module dat3::dat3_pool_routel {
                     fid_re(rec_member.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, earn, false);
                 };
                 let back = leng * fee_s.chatFee - spend;
-                let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
+                let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &to);
                 fid_re(req_member.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, spend, true);
                 if (back > 0) {
                     req_member.amount = req_member.amount + back;
                 };
             };
         };
+        is_sender
     }
 
     //Modify nft reward data
@@ -684,7 +712,7 @@ module dat3::dat3_pool_routel {
 
     // 1. A requester can initiate a payment stream session for a video call.
     public entry fun create_rome(requester: &signer, receiver: address
-    ) acquires Room, FeeStore, RoomState, MemberStore, FidStore, UsersReward
+    ) acquires Room, FeeStore, RoomState, MemberStore, FidStore, UsersReward, DAT3MsgHoder
     {
         let requester_addr = signer::address_of(requester);
         // check users
