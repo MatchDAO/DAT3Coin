@@ -565,8 +565,7 @@ module dat3::dat3_pool_routel {
         return 3u64
     }
 
-    //
-    public entry  fun call_1(account: &signer, to: address):u64
+    public entry  fun call_1(account: &signer, to: address)
     acquires FeeStore, FidStore, UsersReward, DAT3MsgHoder, MemberStore
     {
         let user_address = signer::address_of(account);
@@ -671,7 +670,7 @@ module dat3::dat3_pool_routel {
                 };
             };
         };
-        is_sender
+
     }
 
     //Modify nft reward data
@@ -823,7 +822,7 @@ module dat3::dat3_pool_routel {
         req_reward.taday_spend = req_reward.taday_spend + *fee ;
         req_reward.total_spend = req_reward.total_spend + *fee ;
 
-        if (req_user.fid > 0) {
+        if (req_user.fid != 0) {
             fid_re(req_user.fid, fee_store.invite_reward_fee_den, fee_store.invite_reward_fee_num, *fee, true);
         };
         let earn = (((*fee * 70 as u128) / (100u128)) as u64);

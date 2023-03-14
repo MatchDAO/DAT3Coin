@@ -208,10 +208,11 @@ module dat3::dat3_stake {
         let pool = borrow_global_mut<Pool>(@dat3);
         let user = simple_mapv1::borrow_mut(&mut pool_info.data, &addr);
         assert!(user.amount_staked > 0, error::aborted(EINSUFFICIENT_BALANCE));
+        coin::deposit(addr, coin::extract(&mut pool.stake, user.amount_staked));
         user.amount_staked = 0;
         user.duration = 0;
         user.start_time = 0;
-        coin::deposit(addr, coin::extract(&mut pool.stake, user.amount_staked));
+
     }
 
     // Claim staking rewards without modifying staking position
@@ -339,6 +340,9 @@ module dat3::dat3_stake {
         let start = now - 1;
         let temp = 0u128;
         let passed = ((((now as u128) - (start as u128)) / SECONDS_OF_WEEK) as u64);
+        if (duration > 52) {
+            duration = 52;
+        };
         if (duration > passed) {
             temp = ((duration - passed) as u128);
         };
@@ -524,7 +528,7 @@ module dat3::dat3_stake {
             if (! flexible) {
                 temp = ((duration - passed) as u128);
             };
-            my_today = (staking as u128) * ((temp * rate_of) + rate_of_decimal);
+            my_today = (staking as u128) * ((temp * rate_of) + rate_of_decimal) ;
         };
 
 
@@ -548,8 +552,8 @@ module dat3::dat3_stake {
             };
             //   staking * y''      y''= (week*0.3836)+1
             let taday_r = today_mint * my_today / (today_volume + my_today);
-            let apr = taday_r * 365 * 100000000 / (staking as u128) ;
-            let roi = (taday_r) * 100000000 / (staking as u128) ;
+            let apr = taday_r * 365 * 100000000 / (staking as u128)  / math128::pow(10, (coin::decimals<DAT3>() as u128))  ;
+            let roi = (taday_r) * 100000000 / (staking as u128)  ;
 
             _vedat3 = my_today  ;
             return (total_staking, taday_r, roi, apr, _vedat3, my_today)
@@ -572,7 +576,7 @@ module dat3::dat3_stake {
             leng = vector::length(&users);
             let j = 0u64;
             //simulate mint
-            let mint = simulate_mint(genesis_time, (time as u64));
+            let mint = simulate_mint(genesis_time, (time as u64)) ;
             let _volume = 0u128;
             let passed = (((time - (start as u128)) / SECONDS_OF_WEEK) as u64);
             //current user expiration date
@@ -597,7 +601,9 @@ module dat3::dat3_stake {
                             _volume = _volume + ((temp_user.amount_staked as u128) * (temp * rate_of + rate_of_decimal));
                         }else {
                             vector::swap_remove(&mut users, j)  ;
-                            j = j - 1;
+                            if (j > 1) {
+                                j = j - 1;
+                            };
                             if ((leng - j) > 1) {
                                 leng = leng - 1;
                             };
@@ -616,14 +622,7 @@ module dat3::dat3_stake {
             i = i + 1;
         };
 
-        //   all_simulate_reward * 100000000 /  ((time - (start as u128))/  SECONDS_OF_DAY  ) * 365
-        // a/(b/c)*365
-        // a*365/(b/c)
-        // (a*365)/(b/c)
-        // (a*365*c)/(b/c*c)
-        // (a*365*c)/(b)
-        // a*365*c/b
-        let _apr = all_simulate_reward * 100000000 * 365 / ((time - (start as u128)) / SECONDS_OF_DAY)  ;
+        let _apr = all_simulate_reward * 100000000 * 364 / ((time - (start as u128)) / SECONDS_OF_DAY) / math128::pow(10, (coin::decimals<DAT3>() as u128))   ;
 
         let roi = all_simulate_reward * 100000000 / (staking as u128)   ;
         return (total_staking, all_simulate_reward, roi, _apr, _vedat3, my_today)
@@ -656,5 +655,6 @@ module dat3::dat3_stake {
         };
         let mint = TOTAL_EMISSION / m / 10  ;
         return mint * math128::pow(10, (coin::decimals<DAT3>() as u128))
+        // return mint
     }
 }
