@@ -1,32 +1,64 @@
 module dat3::dat3_pool_routel {
     use std::error;
     use std::signer;
+    use std::string::String;
     use std::vector;
 
-    use aptos_framework::account::{ SignerCapability};
     use aptos_framework::coin;
     use aptos_framework::timestamp;
+
+    use aptos_token::token;
 
     use dat3::dat3_coin::DAT3;
     use dat3::dat3_pool;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
-    use aptos_token::token;
-    use std::string::String;
+
+    struct UsersReward has key, store {
+        data: SimpleMapV1<address, Reward>,
+    }
+
+    struct FidStore has key, store {
+        data: SimpleMapV1<u64, FidReward>,
+    }
 
 
-    // users
-    struct Member has key, store {
-        uid: u64,
+    struct FeeStore has key, store {
+        invite_reward_fee_den: u128,
+        invite_reward_fee_num: u128,
+        chatFee: u64,
+        mFee: SimpleMapV1<u64, u64>,
+    }
+
+    struct RoomState has key, store {
+        data: SimpleMapV1<address, u8>,
+    }
+
+    struct CurrentRoom has key, store {
+        data: SimpleMapV1<address, vector<u64>>,
+    }
+
+    struct MemberStore has key, store {
+        member: SimpleMapV1<address, Member>
+    }
+
+    struct DAT3MsgHoder has key, store {
+        data: SimpleMapV1<address, MsgHoder>
+    }
+
+    struct FidReward has key, store, drop {
+        token: String,
+        collection: String,
         fid: u64,
-        freeze: u64,
+        spend: u64,
+        earn: u64,
+        users: vector<address>,
+        claim: u64,
         amount: u64,
-        mFee: u64,
-
     }
 
     struct MsgHoder has key, store {
-        serders: vector<address>,
-        receiver: SimpleMapV1<address, vector<u64>>
+        senders: vector<address>,
+        receive: SimpleMapV1<address, vector<u64>>
     }
 
     struct Room has key, store {
@@ -43,26 +75,6 @@ module dat3::dat3_pool_routel {
         fid: u64,
     }
 
-    //dat3s
-    struct UsersReward has key, store {
-        data: SimpleMapV1<address, Reward>,
-    }
-
-    struct FidStore has key, store {
-        data: SimpleMapV1<u64, FidReward>,
-    }
-
-    struct RoomState has key, store {
-        data: SimpleMapV1<address, u8>,
-    }
-
-    struct FeeStore has key, store {
-        invite_reward_fee_den: u128,
-        invite_reward_fee_num: u128,
-        chatFee: u64,
-        mFee: SimpleMapV1<u64, u64>,
-    }
-
     struct Reward has drop, key, store {
         taday_spend: u64,
         total_spend: u64,
@@ -75,15 +87,13 @@ module dat3::dat3_pool_routel {
         every_dat3_reward_time: vector<u64>,
     }
 
-    struct FidReward has key, store, drop {
-        token: String,
-        collection: String,
+    struct Member has key, store {
+        addr: address,
+        uid: u64,
         fid: u64,
-        spend: u64,
-        earn: u64,
-        users: vector<address>,
-        all: u64,
         amount: u64,
+        mFee: u64,
+
     }
 
 
@@ -109,9 +119,6 @@ module dat3::dat3_pool_routel {
     const INVALID_ROOM_STATE: u64 = 305;
     const INVALID_ID: u64 = 400;
 
-    struct CapHode has key {
-        sigCap: SignerCapability,
-    }
 
     public entry fun init(account: &signer)
     {
@@ -137,6 +144,15 @@ module dat3::dat3_pool_routel {
         };
         if (!exists<RoomState>(user_address)) {
             move_to(account, RoomState { data: simple_mapv1::create<address, u8>() });
+        };
+        if (!exists<MemberStore>(user_address)) {
+            move_to(account, MemberStore { member: simple_mapv1::create<address, Member>() });
+        };
+        if (!exists<DAT3MsgHoder>(user_address)) {
+            move_to(account, DAT3MsgHoder { data: simple_mapv1::create<address, MsgHoder>() });
+        };
+        if (!exists<CurrentRoom>(user_address)) {
+            move_to(account, CurrentRoom { data: simple_mapv1::create<address, vector<u64>>() });
         };
     }
 
@@ -168,6 +184,7 @@ module dat3::dat3_pool_routel {
                 let user_r = simple_mapv1::borrow_mut(&mut usr.data, user_addr);
                 let td = (((coins as u128) * (user_r.taday_spend as u128) / today_volume) as u64) ;
                 user_r.reward = user_r.reward + td;
+                user_r.taday_spend = 0;
                 vector::push_back(&mut user_r.every_dat3_reward, td);
                 vector::push_back(&mut user_r.every_dat3_reward_time, now);
                 i = i + 1;
@@ -175,18 +192,33 @@ module dat3::dat3_pool_routel {
         };
     }
 
-    //user init
     public entry fun user_init(
         account: &signer,
         fid: u64,
         uid: u64
-    ) acquires FidStore, UsersReward
+    ) acquires FidStore, UsersReward, MemberStore
     {
         let user_address = signer::address_of(account);
+        if (!coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
+            coin::register<0x1::aptos_coin::AptosCoin>(account);
+        };
+        if (!coin::is_account_registered<DAT3>(user_address)) {
+            coin::register<DAT3>(account);
+        };
+        user_init_fun(user_address, fid, uid);
+    }
+
+    //user init
+    fun user_init_fun(
+        user_address: address,
+        fid: u64,
+        uid: u64
+    ) acquires FidStore, UsersReward, MemberStore
+    {
         //cheak_fid
-        assert!(fid > 0, error::invalid_argument(INVALID_ID));
-        let fs = borrow_global_mut<FidStore>(@dat3);
-        assert!(simple_mapv1::contains_key(&fs.data, &fid), error::invalid_argument(INVALID_ARGUMENT));
+        assert!(fid >= 0, error::invalid_argument(INVALID_ID));
+        let fids_tore = borrow_global_mut<FidStore>(@dat3);
+        //assert!(simple_mapv1::contains_key(&fids_tore.data, &fid), error::invalid_argument(INVALID_ARGUMENT));
 
         //init UsersReward
         let user_r = borrow_global_mut<UsersReward>(@dat3);
@@ -197,51 +229,54 @@ module dat3::dat3_pool_routel {
                 ), every_dat3_reward_time: vector::empty<u64>()
             });
         };
-        if (!coin::is_account_registered<0x1::aptos_coin::AptosCoin>(user_address)) {
-            coin::register<0x1::aptos_coin::AptosCoin>(account);
-        };
-        if (!coin::is_account_registered<DAT3>(user_address)) {
-            coin::register<DAT3>(account);
+        if (fid > 0) {
+            //add to FidStore.users
+            let fidr = simple_mapv1::borrow_mut(&mut fids_tore.data, &fid);
+            if (!vector::contains(&mut fidr.users, &user_address)) {
+                vector::push_back(&mut fidr.users, user_address);
+            };
         };
 
-        if (!exists<MsgHoder>(user_address)) {
-            move_to(
-                account,
-                MsgHoder { serders: vector::empty<address>(), receiver: simple_mapv1::create<address, vector<u64>>() }
-            );
-        };
-        let fidr = simple_mapv1::borrow_mut(&mut fs.data, &fid);
-        if (!vector::contains(&mut fidr.users, &user_address)) {
-            vector::push_back(&mut fidr.users, user_address);
-        };
-        if (!exists<Member>(user_address)) {
-            move_to(account, Member {
+
+        //add member
+        let member_hoder = borrow_global_mut<MemberStore>(@dat3);
+        if (!simple_mapv1::contains_key(&mut member_hoder.member, &user_address)) {
+            simple_mapv1::add(&mut member_hoder.member, user_address, Member {
+                addr: user_address,
                 uid,
                 fid,
-                freeze: 0u64,
-                amount: 0u64,
+                amount: 0,
                 mFee: 1,
-            });
+            })
+        }else {
+            let user = simple_mapv1::borrow_mut(&mut member_hoder.member, &user_address);
+            if (user.fid == 0 && fid > 0 && fid < 5000) {
+                user.fid = fid;
+            };
         };
     }
 
     // deposit coin to pool
-    public entry fun deposit(account: &signer, amount: u64) acquires Member
+    public entry fun deposit(account: &signer, amount: u64) acquires MemberStore
     {
         let user_address = signer::address_of(account);
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
-        let auser = borrow_global_mut<Member>(user_address);
-        let user_amount = auser.amount;
-        auser.amount = user_amount + amount;
+        let member_hoder = borrow_global_mut<MemberStore>(@dat3);
+        assert!(simple_mapv1::contains_key(&member_hoder.member, &user_address), error::not_found(NO_USER));
+
+        let user = simple_mapv1::borrow_mut(&mut member_hoder.member, &user_address);
         dat3_pool::deposit(account, amount);
+        user.amount = user.amount + amount;
     }
 
     //withdraw coin to pool
-    public entry fun withdraw(account: &signer, amount: u64) acquires Member
+    public entry fun withdraw(account: &signer, amount: u64) acquires MemberStore
     {
         let user_address = signer::address_of(account);
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
-        let auser = borrow_global_mut<Member>(user_address);
+        let member_hoder = borrow_global_mut<MemberStore>(@dat3);
+        assert!(simple_mapv1::contains_key(&member_hoder.member, &user_address), error::not_found(NO_USER));
+
+        let auser = simple_mapv1::borrow_mut(&mut member_hoder.member, &user_address);
+
         let user_amount = auser.amount;
         assert!(user_amount > amount, error::out_of_range(EINSUFFICIENT_BALANCE));
         auser.amount = user_amount - amount;
@@ -249,21 +284,21 @@ module dat3::dat3_pool_routel {
     }
 
     //claim_reward
-    public entry fun claim_reward(account: &signer, amount: u64) acquires UsersReward
+    public entry fun claim_reward(account: &signer) acquires UsersReward
     {
         let user_address = signer::address_of(account);
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
+
         let user_r = borrow_global_mut<UsersReward>(@dat3);
         if (simple_mapv1::contains_key(&user_r.data, &user_address)) {
             let your = simple_mapv1::borrow_mut(&mut user_r.data, &user_address);
-            assert!(amount <= your.earn, error::out_of_range(EINSUFFICIENT_BALANCE));
-
             if (coin::is_account_registered<DAT3>(user_address)) {
                 coin::register<DAT3>(account)
             };
-            dat3_pool::withdraw_reward(user_address, amount);
-            your.reward = your.reward - amount;
-            your.reward_claim = your.reward_claim + amount;
+            if (your.reward > 0) {
+                dat3_pool::withdraw_reward(user_address, your.reward);
+                your.reward_claim = your.reward_claim + your.reward;
+                your.reward = 0;
+            };
         };
     }
 
@@ -271,13 +306,14 @@ module dat3::dat3_pool_routel {
     public entry fun claim_invite_reward(account: &signer, fid: u64) acquires FidStore
     {
         let addr = signer::address_of(account);
-        assert!(exists<Member>(addr), error::not_found(NO_USER));
         let f_s = borrow_global_mut<FidStore>(@dat3);
         assert!(simple_mapv1::contains_key(&f_s.data, &fid), error::not_found(NOT_FOUND));
         let fid_r = simple_mapv1::borrow_mut(&mut f_s.data, &fid);
 
         if (addr == @dat3 && fid_r.fid == 999999999999999u64) {
             dat3_pool::withdraw(addr, fid_r.amount);
+            fid_r.amount = 0;
+            fid_r.claim = fid_r.claim + fid_r.amount;
             fid_r.amount = 0;
         }else {
             let token_id = token::create_token_id_raw(
@@ -286,22 +322,24 @@ module dat3::dat3_pool_routel {
                 fid_r.token,
                 0
             );
-            if (token::balance_of(addr, token_id) > 0) {
+            if (token::balance_of(addr, token_id) > 0 && fid_r.amount > 0) {
                 dat3_pool::withdraw(addr, fid_r.amount);
+                fid_r.claim = fid_r.claim + fid_r.amount;
                 fid_r.amount = 0;
             };
         };
     }
 
     //Modify user charging standard
-    public entry fun change_my_fee(user: &signer, grade: u64) acquires Member
+    public entry fun change_my_fee(user: &signer, grade: u64) acquires MemberStore
     {
         let user_address = signer::address_of(user);
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
         assert!(grade > 0 && grade <= 5, error::out_of_range(OUT_OF_RANGE));
-        let user_addr = signer::address_of(user);
-        let is_me = borrow_global_mut<Member>(user_addr);
-        is_me.mFee = grade;
+        let member_store = borrow_global_mut<MemberStore>(@dat3);
+        if (simple_mapv1::contains_key(&member_store.member, &user_address)) {
+            let is_me = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
+            is_me.mFee = grade;
+        };
     }
 
     //Modify  charging standard
@@ -349,11 +387,11 @@ module dat3::dat3_pool_routel {
                 simple_mapv1::add(&mut f.data, fid, FidReward {
                     token,
                     collection,
-                    fid: fid,
+                    fid,
                     spend: 0,
                     earn: 0,
                     users: vector::empty<address>(),
-                    all: 0,
+                    claim: 0,
                     amount: 0,
                 });
             };
@@ -370,77 +408,82 @@ module dat3::dat3_pool_routel {
 
     //get user assets
     #[view]
-    public fun assets(addr: address): (u64, u64, u64, u64, u64, u64, u64, u64, u64)
-    acquires Member, UsersReward
+    public fun assets(addr: address): (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64)
+    acquires UsersReward, MemberStore
     {
         let _uid = 0u64;
         let _fid = 0u64;
         let _mFee = 0u64;
         let _amount = 0u64;
-        if (exists<Member>(addr)) {
-            let user = borrow_global<Member>(addr) ;
+        let member_store = borrow_global<MemberStore>(@dat3);
+        if (simple_mapv1::contains_key(&member_store.member, &addr)) {
+            let user = simple_mapv1::borrow(&member_store.member, &addr);
             _uid = user.uid;
             _fid = user.fid;
             _mFee = user.mFee;
             _amount = user.amount;
-        } ;
-
+        };
         let user_r = borrow_global<UsersReward>(@dat3);
-
+        let _taday_spend = 0u64;
+        let _total_spend = 0u64;
         let _earn: u64 = 0;
         let _reward: u64 = 0;
         let _claim: u64 = 0;
-        let _taday_spend = 0;
         if (simple_mapv1::contains_key(&user_r.data, &addr)) {
             let your_reward = simple_mapv1::borrow(&user_r.data, &addr);
+            _taday_spend = your_reward.taday_spend;
+            _total_spend = your_reward.total_spend;
             _earn = your_reward.earn;
             _reward = your_reward.reward;
             _claim = your_reward.reward_claim;
             _taday_spend = your_reward.taday_spend;
         };
         let _apt = 0u64;
-        let dat3 = 0u64;
+        let _dat3 = 0u64;
         if (coin::is_account_registered<0x1::aptos_coin::AptosCoin>(addr)) {
             _apt = coin::balance<0x1::aptos_coin::AptosCoin>(addr)
         };
         if (coin::is_account_registered<DAT3>(addr)) {
-            dat3 = coin::balance<DAT3>(addr)
+            _dat3 = coin::balance<DAT3>(addr)
         } ;
-        (_uid, _fid, _mFee, _apt, dat3, _amount, _reward, _claim, _taday_spend)
+        (_uid, _fid, _mFee, _apt, _dat3, _amount, _reward, _claim, _taday_spend, _total_spend)
     }
 
-    //get user reward_recode
     #[view]
-    public fun reward_recode(addr: address): (u64, u64, vector<u64>, vector<u64>, )
+    public fun reward_record(addr: address): (u64, u64, u64, u64, vector<u64>, vector<u64>, )
     acquires UsersReward
     {
+        let _taday_spend = 0u64;
+        let _total_spend = 0u64;
         let _earn = 0u64;
         let _dat3 = 0u64;
         let _every_reward_time = vector::empty<u64>();
         let _every_reward = vector::empty<u64>();
-        if (exists<Member>(addr)) {
-            // _earn = user.earn;
-            let ueer_r = borrow_global<UsersReward>(@dat3);
-            if (simple_mapv1::contains_key(&ueer_r.data, &addr)) {
-                let r = simple_mapv1::borrow(&ueer_r.data, &addr);
-                _earn = r.earn;
-                _dat3 = r.reward + r.reward_claim;
-                _every_reward_time = r.every_dat3_reward_time;
-                _every_reward = r.every_dat3_reward;
-            };
-        } ;
-        (_earn, _dat3, _every_reward_time, _every_reward)
+        let ueer_r = borrow_global<UsersReward>(@dat3);
+        if (simple_mapv1::contains_key(&ueer_r.data, &addr)) {
+            let r = simple_mapv1::borrow(&ueer_r.data, &addr);
+            _taday_spend = r.taday_spend;
+            _total_spend = r.total_spend;
+            _earn = r.earn;
+            _dat3 = r.reward + r.reward_claim;
+            _every_reward_time = r.every_dat3_reward_time;
+            _every_reward = r.every_dat3_reward;
+        };
+        (_taday_spend, _total_spend, _earn, _dat3, _every_reward_time, _every_reward)
     }
 
     //get user charging standard
     #[view]
-    public fun fee_of_mine(user: address): (u64, u64, u64) acquires FeeStore, Member
+    public fun fee_of_mine(user: address): (u64, u64, u64) acquires FeeStore, MemberStore
     {
-        assert!(exists<Member>(user), error::not_found(NO_USER));
+        let fee_s = borrow_global<FeeStore>(@dat3);
+        let member_store = borrow_global<MemberStore>(@dat3);
+        if (simple_mapv1::contains_key(&member_store.member, &user)) {
+            let is_me = simple_mapv1::borrow (&member_store.member, &user);
+            return (fee_s.chatFee,is_me.mFee,*simple_mapv1::borrow(&fee_s.mFee, &1u64))
+        };
 
-        let is_me = borrow_global<Member>(user);
-        let fee = borrow_global<FeeStore>(@dat3);
-        (fee.chatFee, is_me.mFee, *simple_mapv1::borrow(&fee.mFee, &is_me.mFee))
+        return (fee_s.chatFee, 1u64, *simple_mapv1::borrow(&fee_s.mFee, &1u64))
     }
 
     //get all of charging standard
@@ -465,7 +508,7 @@ module dat3::dat3_pool_routel {
         let f = borrow_global<FidStore>(@dat3);
         if (simple_mapv1::contains_key(&f.data, &fid)) {
             let fr = simple_mapv1::borrow(&f.data, &fid);
-            return (fr.fid, fr.amount, fr.spend, fr.earn, fr.users, fr.all)
+            return (fr.fid, fr.amount, fr.spend, fr.earn, fr.users, fr.claim)
         };
         return (0, 0, 0, 0, vector::empty<address>(), 0)
     }
@@ -473,22 +516,23 @@ module dat3::dat3_pool_routel {
     //Determine whether the current user identity is a receiver or a sender
     #[view]
     public fun is_sender(sender: address, to: address): u64
-    acquires MsgHoder {
-        if (!exists<Member>(sender)) {
+    acquires DAT3MsgHoder {
+        let s = borrow_global<DAT3MsgHoder>(@dat3);
+        if (!simple_mapv1::contains_key(&s.data, &sender)) {
             return 4u64
         };
-        if (!exists<Member>(to)) {
+        if (!simple_mapv1::contains_key(&s.data, &to)) {
             return 5u64
         };
 
-        let m1 = borrow_global<MsgHoder>(to);
-        let m2 = borrow_global<MsgHoder>(sender);
+        let m1 = simple_mapv1::borrow(&s.data, &sender);
+        let m2 = simple_mapv1::borrow(&s.data, &to);
         //is
-        if (vector::contains(&m1.serders, &sender)) {
+        if (vector::contains(&m1.senders, &sender)) {
             return 1u64
         };
         //no
-        if (vector::contains(&m2.serders, &to)) {
+        if (vector::contains(&m2.senders, &to)) {
             return 2u64
         };
         //is
@@ -497,81 +541,93 @@ module dat3::dat3_pool_routel {
 
     //
     public entry fun call_1(account: &signer, to: address)
-    acquires Member, FeeStore, MsgHoder, FidStore, UsersReward
+    acquires FeeStore, FidStore, UsersReward, DAT3MsgHoder, MemberStore
     {
         let user_address = signer::address_of(account);
         // check users
-        assert!(exists<Member>(user_address), error::not_found(NO_USER));
-        assert!(exists<Member>(to), error::not_found(NO_TO_USER));
+        let member_store = borrow_global_mut<MemberStore>(@dat3);
+        assert!(simple_mapv1::contains_key(&member_store.member, &user_address), error::not_found(NO_USER));
         assert!(user_address != to, error::not_found(NO_TO_USER));
         //get fee
         let fee_s = borrow_global<FeeStore>(@dat3);
-        //get user
-        let req_member = borrow_global_mut<Member>(user_address);
-
         let is_sender = is_sender(user_address, to);
-        assert!(is_sender <4, error::not_found(NO_TO_USER));
-
+        let dat3_msg = borrow_global_mut<DAT3MsgHoder>(@dat3);
         //is_sender Deduction chatFee and add TotalConsumption
-        if (is_sender == 1 || is_sender == 3) {
+        if (is_sender == 1 || is_sender == 3 || is_sender == 5) {
+            let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
             //check balance
             assert!(req_member.amount >= fee_s.chatFee, error::out_of_range(EINSUFFICIENT_BALANCE));
             //borrow_mut to_msg_hoder
-            let to_msg_hoder = borrow_global_mut<MsgHoder>(to);
-            //add sender
+
+            //init hoder
+            if (is_sender == 5) {
+                //init to MsgHoder
+                let senders = vector::empty<address>();
+                vector::push_back(&mut senders, user_address);
+                let receive = simple_mapv1::create<address, vector<u64>>();
+                simple_mapv1::add(&mut receive, user_address, vector::empty<u64>());
+                simple_mapv1::add(&mut dat3_msg.data, to, MsgHoder {
+                    senders,
+                    receive,
+                });
+            };
+            //add sender init receiver
             if (is_sender == 3) {
-                vector::push_back(&mut to_msg_hoder.serders, user_address)
+                //add sender
+                let to_hoder = simple_mapv1::borrow_mut(&mut dat3_msg.data, &to);
+                vector::push_back(&mut to_hoder.senders, user_address);
+                if (!simple_mapv1::contains_key(&to_hoder.receive, &user_address)) {
+                    simple_mapv1::add(&mut to_hoder.receive, user_address, vector::empty<u64>());
+                };
             };
             //Record the time of each message
-            if (!simple_mapv1::contains_key(&to_msg_hoder.receiver, &user_address)) {
-               let ho=vector::empty<u64>();
-                vector::push_back(&mut ho, timestamp::now_seconds());
-                simple_mapv1::add(&mut to_msg_hoder.receiver,user_address,ho);
-
-            }else {
-                let vec = vector::empty<u64>();
-                vector::push_back(&mut vec, timestamp::now_seconds());
-                simple_mapv1::add(&mut to_msg_hoder.receiver, user_address, vec);
-            };
-
-            //change user A's balance , that it subtracts fee
+            let to_hoder = simple_mapv1::borrow_mut(&mut dat3_msg.data, &to);
+            let req_receive = simple_mapv1::borrow_mut(&mut to_hoder.receive, &user_address);
+            vector::push_back(req_receive, timestamp::now_seconds());
             req_member.amount = req_member.amount - fee_s.chatFee;
-            //and A Total Consumption add chatFee
-            let ur = borrow_global_mut<UsersReward>(@dat3);
-            let your = simple_mapv1::borrow_mut(&mut ur.data, &user_address);
-            your.taday_spend = your.taday_spend + fee_s.chatFee ;
-            your.total_spend = your.total_spend + fee_s.chatFee ;
-            //Modify nft reward data
-            fid_re(req_member.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, fee_s.chatFee, true);
-        }else {
+            return
+        };
+        //receiver
+        if (is_sender == 2) {
             //is receiver
-            //get msg_hoder of sender
-            let msg_hoder = borrow_global_mut<MsgHoder>(user_address);
-            let vec = simple_mapv1::borrow_mut(&mut msg_hoder.receiver, &to);
-            let leng = vector::length(vec);
+            //get msg_hoder of receiver
+            let msg_hoder = simple_mapv1::borrow_mut(&mut dat3_msg.data, &to);
+            let receive = simple_mapv1::borrow_mut(&mut msg_hoder.receive, &to);
+            let leng = vector::length(receive);
             if (leng > 0) {
                 let i = 0u64;
-                let re = 0u64;
+                let spend = 0u64;
                 let now = timestamp::now_seconds();
                 while (i < leng) {
                     //Effective time
-                    if ((now - *vector::borrow<u64>(vec, i)) < SECONDS_OF_12HOUR) {
-                        re = re + fee_s.chatFee;
+                    if ((now - *vector::borrow<u64>(receive, i)) < SECONDS_OF_12HOUR) {
+                        spend = spend + fee_s.chatFee;
                     };
                     i = i + 1;
                 };
-                if (re > 0) {
-                    let earn = (((re as u128) * 70 / 100) as u64);
-                    req_member.amount = req_member.amount + earn;
+                //reset msg_hoder of sender
+                *receive = vector::empty<u64>();
+                if (spend > 0) {
+                    let rec_member = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
+                    let earn = (((spend as u128) * 70 / 100) as u64);
+                    rec_member.amount = rec_member.amount + earn;
                     //receiver   UsersReward earn
                     let ur = borrow_global_mut<UsersReward>(@dat3);
-                    let your = simple_mapv1::borrow_mut(&mut ur.data, &user_address);
-                    your.earn = your.earn + earn ;
-                    fid_re(req_member.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, earn, false);
+                    let rec = simple_mapv1::borrow_mut(&mut ur.data, &user_address);
+                    rec.earn = rec.earn + earn ;
+
+                    let req = simple_mapv1::borrow_mut(&mut ur.data, &to);
+                    req.total_spend = req.total_spend + spend ;
+                    req.taday_spend = req.taday_spend + spend ;
+                    fid_re(rec_member.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, earn, false);
+                };
+                let back = leng * fee_s.chatFee - spend;
+                let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &user_address);
+                fid_re(req_member.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, spend, true);
+                if (back > 0) {
+                    req_member.amount = req_member.amount + back;
                 };
             };
-            //reset msg_hoder of sender
-            *vec = vector::empty<u64>();
         };
     }
 
@@ -581,13 +637,12 @@ module dat3::dat3_pool_routel {
         let f = borrow_global_mut<FidStore>(@dat3);
         if (simple_mapv1::contains_key(&f.data, &fid)) {
             let fr = simple_mapv1::borrow_mut(&mut f.data, &fid);
-            let val = (((amount as u128) / den  * num) as u64);
+            let val = (((amount as u128) / den * num) as u64);
             if (is_spend) {
                 fr.spend = fr.spend + val;
             }else {
                 fr.earn = fr.earn + val;
             };
-            fr.all = fr.all + val;
             fr.amount = fr.amount + val;
         };
     }
@@ -605,7 +660,7 @@ module dat3::dat3_pool_routel {
         };
     }
 
-    fun room_state_change(addr: address, state: u8) acquires RoomState
+        fun room_state_change(addr: address, state: u8) acquires RoomState
     {
         let data = borrow_global_mut<RoomState>(@dat3) ;
         let s = simple_mapv1::borrow_mut(&mut data.data, &addr);
@@ -614,15 +669,20 @@ module dat3::dat3_pool_routel {
 
     // 1. A requester can initiate a payment stream session for a video call.
     public entry fun create_rome(requester: &signer, receiver: address
-    ) acquires Room, Member, FeeStore, RoomState
+    ) acquires Room, FeeStore, RoomState, MemberStore, FidStore, UsersReward
     {
         let requester_addr = signer::address_of(requester);
-        //check user
+        // check users
+        user_init_fun(receiver, 0, 0);
+        let member_store = borrow_global_mut<MemberStore>(@dat3);
+        assert!(simple_mapv1::contains_key(&member_store.member, &requester_addr), error::not_found(NO_USER));
+
         assert!(requester_addr != receiver, error::invalid_argument(INVALID_RECEIVER));
-        assert!(exists<Member>(requester_addr), error::not_found(NO_USER));
-        assert!(exists<Member>(receiver), error::not_found(NO_RECEIVER_USER));
+
+
         //get req_member
-        let req_member = borrow_global<Member>(requester_addr) ;
+        let req_member = simple_mapv1::borrow_mut(&mut member_store.member, &requester_addr);
+
         //get fee
         let fee_store = borrow_global<FeeStore>(@dat3) ;
         let fee = simple_mapv1::borrow(&fee_store.mFee, &req_member.mFee);
@@ -660,126 +720,90 @@ module dat3::dat3_pool_routel {
         // room_state_re(receiver, 0);
     }
 
-    // 2. The receiver can join the session through the video call link
-    public entry fun join_room(
-        receiver: &signer,
-        requester: address,
-        join: bool
-    ) acquires Room, RoomState, Member
-    {
-        let receiver_addr = signer::address_of(receiver);
-        assert!(exists<Member>(receiver_addr), error::not_found(NO_USER));
-        assert!(exists<Member>(requester), error::not_found(NO_USER));
-        assert!(exists<Room>(requester), error::invalid_state(INVALID_REQUESTER));
-        let req_session = borrow_global_mut<Room>(requester);
-        //check receiver
-        assert!(
-            (req_session.receiver == receiver_addr) && req_session.addr == requester,
-            error::invalid_state(INVALID_RECEIVER)
-        );
-        //get fee
-
-        if (join) {
-            let room_state = assert_room_state(receiver_addr);
-            //check rec state
-            assert!(room_state == 0 || room_state == 9, error::invalid_state(YOU_HAS_ALREADY_JOINED));
-            assert!(!req_session.joined, error::invalid_state(YOU_HAS_ALREADY_JOINED));
-            let req_user = borrow_global_mut<Member>(requester);
-            //check req_user balance
-            assert!(req_user.amount >= req_session.minute_rate, EINSUFFICIENT_BALANCE);
-            req_user.amount = req_user.amount - req_session.minute_rate;
-            req_session.started_at = timestamp::now_seconds();
-            //first minute
-            req_session.minute = 1;
-            req_session.joined = true;
-            req_session.done = false;
-            //Deduction in the first minute
-            req_session.deposit = req_session.deposit + req_session.minute_rate;
-            room_state_re(receiver_addr, 2);
-            room_state_re(requester, 2);
-            //and A Total Consumption add chatFee
-        }else {
-            req_session.done = true;
-            room_state_re(requester, 0);
-        };
-    }
 
     //Charge per minute
-    public entry fun one_minute(requester: &signer) acquires Room, RoomState, Member
+    public entry fun one_minute(
+        requester: &signer,
+        receiver: address,
+    ) acquires MemberStore, FidStore, UsersReward, CurrentRoom, FeeStore
     {
-        let requester_addr = signer::address_of(requester);
-        assert!(exists<Member>(requester_addr), error::not_found(NO_USER));
-        assert!(exists<Room>(requester_addr), error::invalid_state(INVALID_REQUESTER));
-        let req_session = borrow_global_mut<Room>(requester_addr);
-        //check done
-        assert!(!req_session.done, error::invalid_state(INVALID_ROOM_STATE));
-        //check req state
-        assert!(req_session.started_at > 0, error::invalid_state(INVALID_ROOM_STATE));
-        //check rec state
-        assert!(assert_room_state(requester_addr) > 0, error::invalid_state(INVALID_ROOM_STATE));
-        let req_user = borrow_global_mut<Member>(requester_addr);
-        //check req_user balance
-        assert!(req_user.amount >= req_session.minute_rate, error::aborted(EINSUFFICIENT_BALANCE));
-        req_user.amount = req_user.amount - req_session.minute_rate;
+        let req_addr = signer::address_of(requester);
+        // check users
+        let member_store = borrow_global_mut<MemberStore>(@dat3);
+        assert!(simple_mapv1::contains_key(&member_store.member, &req_addr), error::not_found(NO_USER));
 
-        //first minute
-        req_session.minute = req_session.minute + 1;
-        //Deduction in the first minute
-        req_session.deposit = req_session.deposit + req_session.minute_rate;
-    }
+        //init receiver
+        if (!simple_mapv1::contains_key(&member_store.member, &receiver)) {
+            //init UsersReward
+            let user_r = borrow_global_mut<UsersReward>(@dat3);
+            simple_mapv1::add(&mut user_r.data, receiver, Reward {
+                total_spend: 0u64,
+                taday_spend: 0, earn: 0, reward: 0, reward_claim: 0, every_dat3_reward: vector::empty<u64>(
+                ), every_dat3_reward_time: vector::empty<u64>()
+            });
+            //add member
+            simple_mapv1::add(&mut member_store.member, receiver, Member {
+                addr: receiver,
+                uid: 0u64,
+                fid: 0u64,
+                amount: 0,
+                mFee: 1,
+            })
+        };
+        let rec_user = simple_mapv1::borrow(&mut member_store.member, &receiver);
+        let mfee = rec_user.mFee;
 
-    //3. Upon closing of the session, send payment to the receiver, and refund any remaining funds to the requester
-    public entry fun close_room(account: &signer, requester: address, receiver: address)
-    acquires Room, Member, RoomState, FeeStore, FidStore, UsersReward
-    {
-        let account_addr = signer::address_of(account);
-        assert!(exists<Member>(receiver), error::not_found(NO_USER));
-        assert!(exists<Member>(receiver), error::not_found(NO_USER));
-        assert!(exists<Room>(requester), error::invalid_state(INVALID_RECEIVER));
-        let req = borrow_global_mut<Room>(requester);
-        //check done
-        assert!(!req.done, error::invalid_state(INVALID_ROOM_STATE));
-        //check receiver
-        assert!(
-            (req.receiver == receiver) && (req.addr == requester) && (account_addr == req.receiver || account_addr == req.addr),
-            error::invalid_state(INVALID_RECEIVER)
-        );
-        let now_s = timestamp::now_seconds();
-        //to return req.deposit
-        req.finished_at = now_s;
-        req.done = true;
-        let to_rec = req.deposit;
-        req.deposit == 0;
-        let fee_s = borrow_global<FeeStore>(@dat3);
+        let req_user = simple_mapv1::borrow_mut(&mut member_store.member, &req_addr);
 
+        let fee_store = borrow_global_mut<FeeStore>(@dat3);
+        //get fee
+        let fee = simple_mapv1::borrow(&fee_store.mFee, &mfee);
+        assert!(*fee <= req_user.amount, error::aborted(EINSUFFICIENT_BALANCE));
+
+        let current_room = borrow_global_mut<CurrentRoom>(@dat3);
+        let now = timestamp::now_seconds();
+        if (!simple_mapv1::contains_key(&current_room.data, &req_addr)) {
+            simple_mapv1::add(&mut current_room.data, req_addr, vector::singleton(now))
+        }else {
+            let vec = simple_mapv1::borrow_mut(&mut current_room.data, &req_addr);
+            let len = vector::length(vec);
+            if (len == 0 || (now - *vector::borrow(vec, (len - 1))) > 90) {
+                *vec = vector::singleton(now)  ;
+            }else {
+                vector::push_back(vec, now)
+            };
+        };
+
+        req_user.amount = req_user.amount - *fee;
         let ur = borrow_global_mut<UsersReward>(@dat3);
-        let req_reward = simple_mapv1::borrow_mut(&mut ur.data, &requester);
-        req_reward.taday_spend = req_reward.taday_spend + to_rec ;
-        req_reward.total_spend = req_reward.total_spend + to_rec ;
-        //Modify nft reward data
-        fid_re(req.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, to_rec, true);
+        let req_reward = simple_mapv1::borrow_mut(&mut ur.data, &req_addr);
+        req_reward.taday_spend = req_reward.taday_spend + *fee ;
+        req_reward.total_spend = req_reward.total_spend + *fee ;
 
-
-        //to rec
-        let rec_user = borrow_global_mut<Member>(receiver);
-        let earn = (((to_rec * 70 as u128) / (100u128)) as u64);
+        if (req_user.fid > 0) {
+            fid_re(req_user.fid, fee_store.invite_reward_fee_den, fee_store.invite_reward_fee_num, *fee, true);
+        };
+        let earn = (((*fee * 70 as u128) / (100u128)) as u64);
+        let rec_user = simple_mapv1::borrow_mut(&mut member_store.member, &receiver);
         rec_user.amount = rec_user.amount + earn;
         let rec_reward = simple_mapv1::borrow_mut(&mut ur.data, &receiver);
         rec_reward.earn = rec_reward.earn + earn ;
         //earn
-        fid_re(rec_user.fid, fee_s.invite_reward_fee_den, fee_s.invite_reward_fee_num, earn, false);
-        //change state
-        room_state_change(requester, 0);
-        room_state_change(receiver, 0);
+        if (rec_user.fid != 0) {
+            fid_re(rec_user.fid, fee_store.invite_reward_fee_den, fee_store.invite_reward_fee_num, earn, false);
+        };
     }
 
+
     #[view]
-    public fun remaining_time(requester: address): (address, address, u64, u64, u64, u64, u64, bool)
-    acquires Room
+    public fun remaining_time(req_addr: address): vector<u64>
+    acquires CurrentRoom
     {
-        assert!(exists<Room>(requester), error::not_found(NO_USER));
-        let room = borrow_global<Room>(requester);
-        (room.addr, room.receiver, room.started_at, room.finished_at, room.minute_rate, room.minute, room.deposit, room.done)
+        let current_room = borrow_global<CurrentRoom>(@dat3);
+        if (simple_mapv1::contains_key(&current_room.data, &req_addr)) {
+            return *simple_mapv1::borrow(&current_room.data, &req_addr)
+        } ;
+        return vector::empty<u64>()
     }
 
 

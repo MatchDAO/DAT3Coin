@@ -7,12 +7,11 @@ upgrade_policy = "compatible"
 AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework" }
 AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token" }
 DAT3CoinBoot = { local = "../dat3coinboot" }
-veDAT3Coin = { local = "../veDAT3Coin" }
 
 [addresses]
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-dat3 = "0x5e0bafe3d652186845cfbd13c1730faac7ff6c539f565020c3d7668f720e9beb"
-dat3_admin = "0x7f42cc5bed4aa5a2660b2d06b41aa078963c62f4733fae686a18a6bef31b9270"
-dat3_nft = "0xfe86090528f99a2885d1c4106f3c2599acf141d548ced0b91067626d71c18998"
+dat3 = "0xc9f23ee5d4a4fe4dc30d81c900a8f2ecf9e5cca363e6a5bf20d8e6cf740b6197"
+dat3_admin = "0xfeca5fb44de9a008a573e8a1fba809f4bd0150cd4804646f0b5ca23c2e410ca3"
+dat3_nft = "0xa1d3d8f56c5a7d642e452d5dc0c69f379061525033c98a5a22ced0fd9f812740"

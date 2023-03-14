@@ -8,5 +8,5 @@ local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework"
 
 
 [addresses]
-dat3 = "0x5e0bafe3d652186845cfbd13c1730faac7ff6c539f565020c3d7668f720e9beb"
-dat3_admin = "0x7f42cc5bed4aa5a2660b2d06b41aa078963c62f4733fae686a18a6bef31b9270"
+dat3 = "0xc9f23ee5d4a4fe4dc30d81c900a8f2ecf9e5cca363e6a5bf20d8e6cf740b6197"
+dat3_admin = "0xfeca5fb44de9a008a573e8a1fba809f4bd0150cd4804646f0b5ca23c2e410ca3"

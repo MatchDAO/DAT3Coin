@@ -1,13 +1,19 @@
 module dat3::dat3_manager {
+    use std::error;
     use std::signer;
     use std::string::{Self, String, utf8};
+    use std::vector;
 
-    use aptos_framework::account;
+    use aptos_std::math128;
+    use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
     use aptos_framework::event;
     use aptos_framework::timestamp::{Self, now_seconds};
 
+    use aptos_token::token::{Self, TokenMutabilityConfig, create_collection, create_token_mutability_config, create_tokendata, TokenId};
+
     use dat3::dat3_coin::DAT3;
+    use dat3::simple_mapv1::{Self, SimpleMapV1};
 
     #[test_only]
     use aptos_std::debug;
@@ -18,19 +24,11 @@ module dat3::dat3_manager {
     #[test_only]
     use aptos_framework::coin::is_account_registered;
     #[test_only]
+    use aptos_token::token::check_collection_exists;
+    #[test_only]
     use dat3::dat3_pool;
-    use aptos_std::math128;
-    use std::error;
     #[test_only]
     use dat3::dat3_pool_routel;
-    use aptos_framework::account::{ SignerCapability};
-    use dat3::simple_mapv1::SimpleMapV1;
-    use aptos_token::token::{TokenMutabilityConfig, create_collection, create_token_mutability_config, create_tokendata, TokenId};
-    use dat3::simple_mapv1;
-    use std::vector;
-    use aptos_token::token;
-    #[test_only]
-    use aptos_token::token::{check_collection_exists};
     #[test_only]
     use dat3::dat3_stake;
 
@@ -95,7 +93,7 @@ module dat3::dat3_manager {
     //365
     const SECONDS_OF_YEAR: u128 = 31536000 ;
     //ONE DAY
-  //  const SECONDS_OF_DAY: u64 = 86400 ;
+    //  const SECONDS_OF_DAY: u64 = 86400 ;
     const TOTAL_EMISSION: u128 = 7200;
     //0.7
     const TALK_EMISSION: u128 = 5040;
@@ -203,11 +201,19 @@ module dat3::dat3_manager {
         let i = 0;
         while (i < len) {
             let name = vector::borrow(&names, i);
-            if (simple_mapv1::contains_key(&cnf.tokens, name))
-                {
-                    i = i + 1;
-                    continue
-                };
+            let token_name = cnf.token_name_base;
+            string::append(&mut token_name, *name);
+            let token_id = token::create_token_id_raw(
+                @dat3_nft,
+                cnf.collection_name,
+                token_name,
+                0
+            );
+            if (token::balance_of(addr, token_id) > 0) {
+                i = i + 1;
+                continue
+            };
+
             let token_uri = uri ;
             string::append(&mut token_uri, *name);
             string::append(&mut token_uri, png);
@@ -215,8 +221,6 @@ module dat3::dat3_manager {
             let value = string::bytes(&u64_to_string(string::length(name)));
             vector::push_back(&mut property_values, *value);
 
-            let token_name = cnf.token_name_base;
-            string::append(&mut token_name, *name);
 
             let token_data_id = create_tokendata(
                 &sig,
@@ -234,8 +238,9 @@ module dat3::dat3_manager {
                 property_types,
             );
             let token_id = token::mint_token(&sig, token_data_id, 1);
-            simple_mapv1::add(&mut cnf.tokens, *name, token_id);
+            // simple_mapv1::add(&mut cnf.tokens, *name, token_id);
             token::direct_transfer(&sig, admin, token_id, 1);
+            i = i + 1;
 
             //  vector::push_back(&mut tids, token_id);
         };
@@ -342,8 +347,9 @@ module dat3::dat3_manager {
         let last = borrow_global_mut<MintTime>(@dat3);
         last.supplyAmount = (mint_amount as u64) + last.supplyAmount;
     }
+
     #[view]
-    public  fun genesis_info():(u64,u128,u64) acquires  MintTime, GenesisInfo
+    public fun genesis_info(): (u64, u128, u64) acquires MintTime, GenesisInfo
     {
         let last = borrow_global<MintTime>(@dat3);
         let gen = borrow_global<GenesisInfo>(@dat3);
@@ -355,9 +361,10 @@ module dat3::dat3_manager {
             m = m * 2;
             i = i + 1;
         };
-        let mint = TOTAL_EMISSION*(coin::decimals<DAT3>() as u128) / m ;
-        (gen.genesis_time,mint,(last.time+ 86400))
+        let mint = TOTAL_EMISSION * (coin::decimals<DAT3>() as u128) / m ;
+        (gen.genesis_time, mint, (last.time + 86400))
     }
+
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
     fun dat3_coin_init(dat3: &signer, to: &signer, fw: &signer) acquires HodeCap, MintTime, GenesisInfo
     {
@@ -380,14 +387,14 @@ module dat3::dat3_manager {
         coin::register<DAT3>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
         dat3_pool_routel::init(dat3);
-           dat3_pool_routel::change_sys_fid(dat3,999u64,
-            false,string::utf8(b"t1"),string::utf8(b"c1"));
+        dat3_pool_routel::change_sys_fid(dat3, 999u64,
+            false, string::utf8(b"t1"), string::utf8(b"c1"));
 
         dat3_pool_routel::user_init(dat3, 999,
-            100 );
+            100);
         // user: &signer, fid: u64, del: bool, token: String, collection: String
-        dat3_pool_routel::change_sys_fid(dat3,100,false,string::utf8(b"t1"),string::utf8(b"c1"));
-        let (v1,v2,v3,v4,v5,v6 )= dat3_pool_routel::fid_reward(100);
+        dat3_pool_routel::change_sys_fid(dat3, 100, false, string::utf8(b"t1"), string::utf8(b"c1"));
+        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::fid_reward(100);
         // let (v1,v2,v3,v4,v5,v6,v7,v8)=dat3_pool_routel::assets(addr);
         debug::print(&v1);
         debug::print(&v2);
@@ -517,21 +524,37 @@ module dat3::dat3_manager {
         dat3_stake::withdraw(dat3);
         debug::print(&coin::balance<DAT3>(addr));
         debug::print(&coin::balance<DAT3>(addr));
-          let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11) = dat3_stake::your_staking(addr);
-         debug::print(&string::utf8(b"begin"));
-         debug::print(&v1);
-         debug::print(&v2);
-         debug::print(&v3);
-         debug::print(&v4);
-         debug::print(&v5);
-         debug::print(&v6);
-         debug::print(&v7);
-         debug::print(&v8);
-         debug::print(&v9);
-         debug::print(&v10);
-         debug::print(&v11);
+        // let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) = dat3_stake::your_staking(addr);
+        // debug::print(&string::utf8(b"begin"));
+        // debug::print(&v1);
+        // debug::print(&v2);
+        // debug::print(&v3);
+        // debug::print(&v4);
+        // debug::print(&v5);
+        // debug::print(&v6);
+        // debug::print(&v7);
+        // debug::print(&v8);
+        // debug::print(&v9);
+        // debug::print(&v10);
+        // debug::print(&v11);
+        // debug::print(&v12);
+        //
+        // (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) = dat3_stake::your_staking_more(addr, 100, 10);
+        // debug::print(&string::utf8(b"begin"));
+        // debug::print(&v1);
+        // debug::print(&v2);
+        // debug::print(&v3);
+        // debug::print(&v4);
+        // debug::print(&v5);
+        // debug::print(&v6);
+        // debug::print(&v7);
+        // debug::print(&v8);
+        // debug::print(&v9);
+        // debug::print(&v10);
+        // debug::print(&v11);
+        // debug::print(&v12);
 
-         (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11) = dat3_stake::your_staking_more(addr,100,10);
+        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) = dat3_stake::apr(1, 100, true);
         debug::print(&string::utf8(b"begin"));
         debug::print(&v1);
         debug::print(&v2);
@@ -544,21 +567,24 @@ module dat3::dat3_manager {
         debug::print(&v9);
         debug::print(&v10);
         debug::print(&v11);
+        debug::print(&v12);
     }
 
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
     fun dat3_routel_call(dat3: &signer, to: &signer, fw: &signer) acquires HodeCap, MintTime, GenesisInfo
     {
+        debug::print(&u64_to_string(6u64));
+        debug::print(&intToString(6u64));
         timestamp::set_time_has_started_for_testing(fw);
-         timestamp::update_global_time_for_test(1);
+        timestamp::update_global_time_for_test(1);
 
         let addr = signer::address_of(dat3);
         let to_addr = signer::address_of(to);
         create_account(addr);
         create_account(to_addr);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(fw);
-        coin::deposit(signer::address_of(dat3), coin::mint(100000000, &mint_cap));
-        coin::deposit(signer::address_of(dat3), coin::mint(100000000, &mint_cap));
+        coin::deposit(signer::address_of(dat3), coin::mint(100111000000, &mint_cap));
+        coin::deposit(signer::address_of(dat3), coin::mint(101110000000, &mint_cap));
 
         init_dat3_coin(dat3);
         dat3_pool::init_pool(dat3);
@@ -566,25 +592,25 @@ module dat3::dat3_manager {
         coin::register<0x1::aptos_coin::AptosCoin>(dat3);
         debug::print(&is_account_registered<DAT3>(addr));
         dat3_pool_routel::init(dat3);
-        dat3_pool_routel::change_sys_fid(dat3,999u64,
-            false,string::utf8(b"t999"),string::utf8(b"c999"));
-        dat3_pool_routel::change_sys_fid(dat3,998u64,
-            false,string::utf8(b"t998"),string::utf8(b"c998"));
+        dat3_pool_routel::change_sys_fid(dat3, 999u64,
+            false, string::utf8(b"t999"), string::utf8(b"c999"));
+        dat3_pool_routel::change_sys_fid(dat3, 998u64,
+            false, string::utf8(b"t998"), string::utf8(b"c998"));
 
         dat3_pool_routel::user_init(dat3, 999,
-            100 );
-        dat3_pool_routel::user_init(to, 998,
-            100 );
+            100);
+        // dat3_pool_routel::user_init(to, 998,
+        //     100);
         // user: &signer, fid: u64, del: bool, token: String, collection: String
-        dat3_pool_routel::change_sys_fid(dat3,100,false,string::utf8(b"t1"),string::utf8(b"c1"));
-        dat3_pool_routel::deposit(dat3,10000000);
-        debug::print(&dat3_pool_routel::is_sender(addr,to_addr));
+        dat3_pool_routel::change_sys_fid(dat3, 100, false, string::utf8(b"t1"), string::utf8(b"c1"));
+        dat3_pool_routel::deposit(dat3, 10000000);
+        debug::print(&dat3_pool_routel::is_sender(addr, to_addr));
 
 
-       // debug::print(&(((1000000 as u128) * 500  / 100000)));
-        dat3_pool_routel::call_1(dat3,to_addr);
-        dat3_pool_routel::call_1(to,addr);
-         let (v1,v2,v3,v4,v5,v6,v7,v8,v9)=dat3_pool_routel::assets(addr);
+        // debug::print(&(((1000000 as u128) * 500  / 100000)));
+        dat3_pool_routel::call_1(dat3, to_addr);
+        // dat3_pool_routel::call_1(to, addr);
+        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) = dat3_pool_routel::assets(to_addr);
         debug::print(&string::utf8(b"begin11111"));
         debug::print(&v1);
         debug::print(&v2);
@@ -595,10 +621,11 @@ module dat3::dat3_manager {
         debug::print(&v7);
         debug::print(&v8);
         debug::print(&v9);
+        debug::print(&v10);
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
         debug::print(&string::utf8(b"begin22222"));
-        let (v1,v2,v3,v4,v5,v6 )= dat3_pool_routel::fid_reward(999);
+        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::fid_reward(999);
         // let (v1,v2,v3,v4,v5,v6,v7,v8)=dat3_pool_routel::assets(addr);
         debug::print(&v1);
         debug::print(&v2);
@@ -607,38 +634,51 @@ module dat3::dat3_manager {
         debug::print(&v5);
         debug::print(&v6);
         dat3_pool_routel::to_reward(dat3);
-        let (v1,v2,v3,v4)=dat3_pool_routel::reward_recode(to_addr);
+        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::reward_record(to_addr);
         debug::print(&string::utf8(b"begin3333333333"));
-        debug::print(&v1);
-        debug::print(&v2);
-        debug::print(&v3);
-        debug::print(&v4);
-        dat3_pool_routel::create_rome(dat3,to_addr);
-        timestamp::update_global_time_for_test(1100000);
-        debug::print(& timestamp::now_seconds());
-        dat3_pool_routel::join_room(to,addr,true);
-        timestamp::update_global_time_for_test(8100000);
-        dat3_pool_routel::one_minute(dat3);
-        let (v1,v2,v3,v4,v5,v6,v7,v8)= dat3_pool_routel::remaining_time(addr);
-        debug::print(&string::utf8(b"begin44444444444444"));
         debug::print(&v1);
         debug::print(&v2);
         debug::print(&v3);
         debug::print(&v4);
         debug::print(&v5);
         debug::print(&v6);
-        debug::print(&v7);
-        debug::print(&v8);
-        dat3_pool_routel::close_room(to,addr,to_addr);
+        timestamp::update_global_time_for_test(1100000);
+        debug::print(&timestamp::now_seconds());
 
-        let (v1,v2,v3,v4)=dat3_pool_routel::reward_recode(to_addr);
+        timestamp::update_global_time_for_test(8100000);
+        dat3_pool_routel::one_minute(dat3,to_addr);
+        let v1 = dat3_pool_routel::remaining_time(addr);
+        debug::print(&string::utf8(b"begin44444444444444"));
+        debug::print(&v1);
+        timestamp::update_global_time_for_test(18100000);
+        dat3_pool_routel::one_minute(dat3,to_addr);
+        timestamp::update_global_time_for_test(28100000);
+        dat3_pool_routel::one_minute(dat3,to_addr);
+        let v1 = dat3_pool_routel::remaining_time(addr);
+        debug::print(&string::utf8(b"begin44444444444444"));
+        debug::print(&v1);
+
+
+
+        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::reward_record(to_addr);
         debug::print(&string::utf8(b"begin5555555"));
         debug::print(&v1);
         debug::print(&v2);
         debug::print(&v3);
         debug::print(&v4);
-
+        debug::print(&v5);
+        debug::print(&v6);
+        let (v1, v2, v3, v4, v5, v6) = dat3_pool_routel::reward_record(addr);
+        debug::print(&string::utf8(b"begin6666666666666666"));
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
     }
+
+    const NUM_VEC: vector<u8> = b"0123456789";
 
     fun u64_to_string(value: u64): String
     {
@@ -652,5 +692,21 @@ module dat3::dat3_manager {
         };
         vector::reverse(&mut buffer);
         utf8(buffer)
+    }
+
+    fun intToString(_n: u64): String {
+        let v = _n;
+        let str_b = b"";
+        if (v > 0) {
+            while (v > 0) {
+                let rest = v % 10;
+                v = v / 10;
+                vector::push_back(&mut str_b, *vector::borrow(&NUM_VEC, rest));
+            };
+            vector::reverse(&mut str_b);
+        } else {
+            vector::append(&mut str_b, b"0");
+        };
+        string::utf8(str_b)
     }
 }

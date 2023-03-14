@@ -7,7 +7,7 @@
 # Deploy step 2 :init
 # Deploy step 2 :compile veDAT3Coin
 # 0K ,The goal is to get the deployer's signature,
-DAT3='0x5e0bafe3d652186845cfbd13c1730faac7ff6c539f565020c3d7668f720e9beb'
+DAT3='0xc9f23ee5d4a4fe4dc30d81c900a8f2ecf9e5cca363e6a5bf20d8e6cf740b6197'
 PROFILE="devnet"
 echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd `
@@ -23,32 +23,7 @@ cd $BOOT_PATH
 #echo "aptos move publish -->  $BOOT_PATH  "
 #echo `aptos move publish --assume-yes --package-dir "$BOOT_PATH" `
 echo "1-------------------------------------------------------------------------------------------"
-#cd $COIN_PATH
-#echo " step 2 :bigin compile veDAT3Coin : -->`pwd`"
-#echo "`ls`"
-#echo "aptos move compile --> $COIN_PATH "
-#echo `aptos move compile --save-metadata --package-dir  $COIN_PATH`
-#echo""
 
-#hexdump -ve '1/1 "%.2x"' build/veDAT3Coin/package-metadata.bcs > meta.hex
-#hexdump -ve '1/1 "%.2x"' build/veDAT3Coin/bytecode_modules/vedat3_coin.mv > coin.hex
-#xxd -ps -c10000000 build/veDAT3Coin/package-metadata.bcs > meta.hex
-#xxd -ps -c10000000 build/veDAT3Coin/bytecode_modules/vedat3_coin.mv > coin.hex
-#META=`xxd  -ps -c10000000  build/veDAT3Coin/package-metadata.bcs`
-#echo""
-#CODE=`xxd  -ps -c10000000  build/veDAT3Coin/bytecode_modules/vedat3_coin.mv`
-#echo "mata: $META"
-#echo "code: $CODE"
-#
-#sleep 3 #
-#echo "2-------------------------------------------------------------------------------------------"
-#echo " step 3 :run dat3::dat3_coin_boot::initializeWithResourceAccount() "
-#echo " begin"
-#echo "$DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:$META  hex:$CODE"
-#echo""
-#echo `aptos move run   --assume-yes --function-id $DAT3::dat3_coin_boot::initializeWithResourceAccount --args hex:"$META" hex:"$CODE" string:"dat3"`
-#sleep 2
-#echo""
  cd $DAT3Pool
 echo "aptos move compile -->  $DAT3Pool --bytecode-version 6 "
 echo `aptos move compile --save-metadata --package-dir  $DAT3Pool --bytecode-version 6`
