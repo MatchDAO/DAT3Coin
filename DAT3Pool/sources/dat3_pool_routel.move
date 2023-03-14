@@ -12,6 +12,7 @@ module dat3::dat3_pool_routel {
     use dat3::dat3_coin::DAT3;
     use dat3::dat3_pool;
     use dat3::simple_mapv1::{Self, SimpleMapV1};
+    use std::string;
 
     struct UsersReward has key, store {
         data: SimpleMapV1<address, Reward>,
@@ -216,7 +217,7 @@ module dat3::dat3_pool_routel {
     ) acquires FidStore, UsersReward, MemberStore
     {
         //cheak_fid
-        assert!(fid >= 0, error::invalid_argument(INVALID_ID));
+        assert!(fid >= 0 && fid <= 5000, error::invalid_argument(INVALID_ID));
         let fids_tore = borrow_global_mut<FidStore>(@dat3);
         //assert!(simple_mapv1::contains_key(&fids_tore.data, &fid), error::invalid_argument(INVALID_ARGUMENT));
 
@@ -230,6 +231,20 @@ module dat3::dat3_pool_routel {
             });
         };
         if (fid > 0) {
+            if (!simple_mapv1::contains_key(&mut fids_tore.data, &fid)) {
+                let token = string::utf8(b"DAT3 Invitation Pass#");
+                string::append(&mut token, intToString(fid));
+                simple_mapv1::add(&mut fids_tore.data, fid, FidReward {
+                    token,
+                    collection: string::utf8(b"DAT3 Invitation Pass"),
+                    fid,
+                    spend: 0,
+                    earn: 0,
+                    users: vector::empty<address>(),
+                    claim: 0,
+                    amount: 0,
+                })
+            };
             //add to FidStore.users
             let fidr = simple_mapv1::borrow_mut(&mut fids_tore.data, &fid);
             if (!vector::contains(&mut fidr.users, &user_address)) {
@@ -479,8 +494,8 @@ module dat3::dat3_pool_routel {
         let fee_s = borrow_global<FeeStore>(@dat3);
         let member_store = borrow_global<MemberStore>(@dat3);
         if (simple_mapv1::contains_key(&member_store.member, &user)) {
-            let is_me = simple_mapv1::borrow (&member_store.member, &user);
-            return (fee_s.chatFee,is_me.mFee,*simple_mapv1::borrow(&fee_s.mFee, &1u64))
+            let is_me = simple_mapv1::borrow(&member_store.member, &user);
+            return (fee_s.chatFee, is_me.mFee, *simple_mapv1::borrow(&fee_s.mFee, &is_me.mFee))
         };
 
         return (fee_s.chatFee, 1u64, *simple_mapv1::borrow(&fee_s.mFee, &1u64))
@@ -660,7 +675,7 @@ module dat3::dat3_pool_routel {
         };
     }
 
-        fun room_state_change(addr: address, state: u8) acquires RoomState
+    fun room_state_change(addr: address, state: u8) acquires RoomState
     {
         let data = borrow_global_mut<RoomState>(@dat3) ;
         let s = simple_mapv1::borrow_mut(&mut data.data, &addr);
@@ -816,5 +831,23 @@ module dat3::dat3_pool_routel {
             return *simple_mapv1::borrow(&room_state, &addr)
         };
         return 9u8
+    }
+
+    const NUM_VEC: vector<u8> = b"0123456789";
+
+    fun intToString(_n: u64): String {
+        let v = _n;
+        let str_b = b"";
+        if (v > 0) {
+            while (v > 0) {
+                let rest = v % 10;
+                v = v / 10;
+                vector::push_back(&mut str_b, *vector::borrow(&NUM_VEC, rest));
+            };
+            vector::reverse(&mut str_b);
+        } else {
+            vector::append(&mut str_b, b"0");
+        };
+        string::utf8(str_b)
     }
 }
