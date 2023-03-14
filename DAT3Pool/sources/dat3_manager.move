@@ -255,7 +255,7 @@ module dat3::dat3_manager {
         assert!(!exists<GenesisInfo>(@dat3), error::already_exists(ALREADY_EXISTS));
         let (burnCap, freezeCap, mintCap) =
             coin::initialize<DAT3>(owner,
-                string::utf8(b"DAT3 Coin"),
+                string::utf8(b"DAT3"),
                 string::utf8(b"DAT3"),
                 6u8, true);
         move_to(owner, HodeCap {
@@ -519,13 +519,14 @@ module dat3::dat3_manager {
         // dat3_pool_routel::init(dat3);
         debug::print(&string::utf8(b"begin"));
         debug::print(&coin::balance<DAT3>(addr));
-        dat3_stake::deposit(dat3, 10000000, 10);
+      //  dat3_stake::deposit(dat3, 10000000, 10);
         debug::print(&coin::balance<DAT3>(addr));
        // dat3_stake::withdraw(dat3);
         debug::print(&coin::balance<DAT3>(addr));
         debug::print(&coin::balance<DAT3>(addr));
-        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) = dat3_stake::your_staking(addr);
-        debug::print(&string::utf8(b"0000000000000000000000000000000000"));
+        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) =
+            dat3_stake::apr(10000000000000, 25, false);
+        debug::print(&string::utf8(b"begin1111111111111111111111111"));
         debug::print(&v1);
         debug::print(&v2);
         debug::print(&v3);
@@ -539,36 +540,42 @@ module dat3::dat3_manager {
         debug::print(&v11);
         debug::print(&v12);
 
-        dat3_stake::deposit(dat3, 10000000, 10);
-        (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) = dat3_stake::your_staking_more(addr, 10000000, 1);
-        debug::print(&string::utf8(b"111111111111111111111111111111111111"));
-        debug::print(&v1);
-        debug::print(&v2);
-        debug::print(&v3);
-        debug::print(&v4);
-        debug::print(&v5);
-        debug::print(&v6);
-        debug::print(&v7);
-        debug::print(&v8);
-        debug::print(&v9);
-        debug::print(&v10);
-        debug::print(&v11);
-        debug::print(&v12);
 
-        let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) = dat3_stake::apr(1, 100, true);
-        debug::print(&string::utf8(b"begin"));
-        debug::print(&v1);
-        debug::print(&v2);
-        debug::print(&v3);
-        debug::print(&v4);
-        debug::print(&v5);
-        debug::print(&v6);
-        debug::print(&v7);
-        debug::print(&v8);
-        debug::print(&v9);
-        debug::print(&v10);
-        debug::print(&v11);
-        debug::print(&v12);
+        //
+        // let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) =
+        //     dat3_stake::your_staking(addr);
+        // debug::print(&string::utf8(b"0000000000000000000000000000000000"));
+        // debug::print(&v1);
+        // debug::print(&v2);
+        // debug::print(&v3);
+        // debug::print(&v4);
+        // debug::print(&v5);
+        // debug::print(&v6);
+        // debug::print(&v7);
+        // debug::print(&v8);
+        // debug::print(&v9);
+        // debug::print(&v10);
+        // debug::print(&v11);
+        // debug::print(&v12);
+        //
+        // dat3_stake::deposit(dat3, 10000000, 10);
+        // (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12) =
+        //     dat3_stake::your_staking_more(addr, 10000000, 1);
+        // debug::print(&string::utf8(b"111111111111111111111111111111111111"));
+        // debug::print(&v1);
+        // debug::print(&v2);
+        // debug::print(&v3);
+        // debug::print(&v4);
+        // debug::print(&v5);
+        // debug::print(&v6);
+        // debug::print(&v7);
+        // debug::print(&v8);
+        // debug::print(&v9);
+        // debug::print(&v10);
+        // debug::print(&v11);
+        // debug::print(&v12);
+
+
     }
 
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
@@ -599,10 +606,10 @@ module dat3::dat3_manager {
         dat3_pool_routel::deposit(dat3, 1000000000);
         debug::print(&(((1000000 as u128) * 500  / 100000)));
         debug::print(&string::utf8(b"00000000000000000000"));
-        debug::print(&dat3_pool_routel::call_1(dat3, to_addr));
-        debug::print(&dat3_pool_routel::call_1(dat3, to_addr));
-        debug::print(&dat3_pool_routel::is_sender(to_addr, addr));
-         debug::print(&dat3_pool_routel::call_1(to, addr));
+        // debug::print(&dat3_pool_routel::call_1(dat3, to_addr));
+        // debug::print(&dat3_pool_routel::call_1(dat3, to_addr));
+        // debug::print(&dat3_pool_routel::is_sender(to_addr, addr));
+        //  debug::print(&dat3_pool_routel::call_1(to, addr));
 
         // dat3_pool_routel::call_1(to, addr);
         let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) =
@@ -662,6 +669,14 @@ module dat3::dat3_manager {
         debug::print(&v6);
         let (v1, v2, v3, v4, v5, v6) =
             dat3_pool_routel::fid_reward(998);
+        debug::print(&v1);
+        debug::print(&v2);
+        debug::print(&v3);
+        debug::print(&v4);
+        debug::print(&v5);
+        debug::print(&v6);
+        let (v1, v2, v3, v4, v5, v6) =
+        dat3_pool_routel::fid_reward(999);
         debug::print(&v1);
         debug::print(&v2);
         debug::print(&v3);
